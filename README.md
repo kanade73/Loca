@@ -9,8 +9,7 @@
 
 > I couldn't afford Claude Code. So I built my own.
 
-![Uploading スクリーンショット 2026-02-22 11.26.13.png…]()
-
+<img width="867" height="502" alt="スクリーンショット 2026-02-22 11 26 13" src="https://github.com/user-attachments/assets/debf4f8a-107d-465a-af38-19e93208ffc1" />
 
 Loca（ロカ）は、ローカルLLMを使って自律的に思考し、コードを書き、使えば使うほどあなた専用に育っていくCLI型のAIコーディングエージェントです。APIキー不要、課金不要。`uv sync`と`loca`だけで動きます。
 
