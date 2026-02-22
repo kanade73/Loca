@@ -1,0 +1,24 @@
+[tool.uv]
+package = true
+[project]
+name = "Loca"
+version = "0.1.0"
+description = "Autonomous CLI agent app (Loca) using LiteLLM and Rich"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "litellm>=1.81.13",  # OpenAI/Anthropic等のAPI抽象化
+    "ollama",            # ローカルLLM用（LiteLLMの裏側で呼ばれることがあります）
+    "rich",              # ターミナルの美しいUI表示用
+    "django>=6.0.2",
+    "pygame>=2.6.1",
+    "prompt-toolkit>=3.0.52",
+    "typer",
+    "ddgs>=9.10.0",
+]
+
+[project.scripts]
+# ★ ここが超重要！
+# 先ほど main.py の最後に作った `cli` 関数を、グローバルコマンドとして登録します。
+# これでターミナルで `loca` と打つだけで起動するようになります！
+loca = "loca.main:cli"
