@@ -45,7 +45,6 @@ def chat_with_llm(messages: list, model_name: str, provider: str = "ollama", is_
         # OpenAIの場合はそのまま "gpt-4o" 等で動くが、統一のために openai/gpt-4o の形にしてもOK
         litellm_model = f"{provider}/{model_name}" if provider != "openai" else model_name
 
-        # これ1行で、OpenAIでもOllamaでも自動でAPIの形を変換して通信してくれます！
         response = litellm.completion(
             model=litellm_model,
             messages=messages,

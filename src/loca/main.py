@@ -260,14 +260,30 @@ def main(model_name: str, provider: str):
                 confirm = 'y'
                 console.print("[dim]🤖 Auto Mode: 自動で書き込みを許可しました。[/dim]")
             else:
-                confirm = console.input("[bold]編集を許可しますか？ [y/N]: [/bold]").strip().lower()
+                console.print("[dim]💡 ヒント: 'n 理由' でAIに指示を出せます。'q' でタスクを強制終了できます。[/dim]")
+                confirm = input("編集を許可しますか？ [y/N/q]: ").strip()
                 
-            if confirm == 'y':
+            if confirm.lower() == 'y' or confirm == '':
                 result_output = write_file(filepath, content)
                 console.print(f"[dim]ファイルに書き込みました。[/dim]")
+                
+            elif confirm.lower() == 'q':
+                # 【Kill機能】タスク自体を強制終了してユーザー入力に戻る
+                console.print("[bold red]🛑 タスクを強制終了(Kill)しました。[/bold red]")
+                messages.append({"role": "user", "content": "ユーザーがこの処理を強制終了しました。絶対にこれ以上何もせず、すぐに Action: none を返して待機状態に戻ってください。"})
+                needs_user_input = True
+                continue
+                
             else:
-                result_output = "キャンセルされました。"
-                console.print(f"[dim]書き込みをキャンセルしました。[/dim]")
+                # 【フィードバック機能】'n'の後に理由を書けるようにする (例: "n その変数は消さないで")
+                reason = confirm[1:].strip() if confirm.lower().startswith('n') and len(confirm) > 1 else ""
+                
+                if reason:
+                    result_output = f"ユーザーに拒否されました。理由: {reason} （※指示に従い、同じ変更は絶対に繰り返さないでください）"
+                else:
+                    result_output = "ユーザーに拒否されました。（※同じアクションを繰り返すのは禁止です。別のアプローチを提案するか、人間に質問してください）"
+                    
+                console.print(f"[dim]書き込みをキャンセルし、AIに強い拒否のフィードバックを送りました。[/dim]")
 
         elif action == "edit_file":
             filepath = args.get("filepath", "")
@@ -281,14 +297,29 @@ def main(model_name: str, provider: str):
                 confirm = 'y'
                 console.print("[dim]🤖 Auto Mode: 自動で編集を許可しました。[/dim]")
             else:
-                confirm = console.input("[bold]編集を許可しますか？ [y/N]: [/bold]").strip().lower()
+                # ★ ここからキルスイッチとフィードバック対応にアップグレード！
+                console.print("[dim]💡 ヒント: 'n 理由' でAIに指示を出せます。'q' でタスクを強制終了できます。[/dim]")
+                confirm = console.input("[bold]編集を許可しますか？ [y/N/q]: [/bold]").strip()
             
-            if confirm == 'y':
+            if confirm.lower() == 'y' or confirm == '':
                 result_output = edit_file(filepath, old_text, new_text)
                 console.print(f"[dim]ファイルを編集しました。[/dim]")
+                
+            elif confirm.lower() == 'q':
+                # 【Kill機能】
+                console.print("[bold red]🛑 タスクを強制終了(Kill)しました。[/bold red]")
+                messages.append({"role": "user", "content": "ユーザーがこの処理を強制終了しました。絶対にこれ以上何もせず、すぐに Action: none を返して待機状態に戻ってください。"})
+                needs_user_input = True
+                continue
+                
             else:
-                result_output = "キャンセルされました。"
-                console.print(f"[dim]編集をキャンセルしました。[/dim]")
+                # 【フィードバック機能】
+                reason = confirm[1:].strip() if confirm.lower().startswith('n') and len(confirm) > 1 else ""
+                if reason:
+                    result_output = f"ユーザーに拒否されました。理由: {reason} （※指示に従い、同じ変更は絶対に繰り返さないでください）"
+                else:
+                    result_output = "ユーザーに拒否されました。（※同じアクションを繰り返すのは禁止です。別のアプローチを提案するか、人間に質問してください）"
+                console.print(f"[dim]編集をキャンセルし、AIに強い拒否のフィードバックを送りました。[/dim]")
 
         elif action == "read_directory":
             dir_path = args.get("dir_path", ".")

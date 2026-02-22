@@ -9,8 +9,6 @@
 
 **LOCAL AI · FREE · YOURS**
 
-> クレカがなくてClaude Codeに課金できない。だから自分で作った。
-
 <img width="867" height="502" alt="スクリーンショット" src="https://github.com/user-attachments/assets/debf4f8a-107d-465a-af38-19e93208ffc1" />
 
 Loca（ロカ）は、ローカルLLMを使って自律的に思考し、コードを書き、使えば使うほどあなた専用に育っていくCLI型のAIコーディングエージェントです。APIキー不要、課金不要。`uv sync` と `loca` だけで動きます。
@@ -32,7 +30,88 @@ ollama pull qwen2.5-coder:7b
 ```
 
 ### 2. Locaのセットアップ
+                                                                                                            │
+│                    Systems Online. Connected to local brain: qwen2.5-coder:32b (OLLAMA)                    │
+│                                                                                                            │
+╰─────────────────────────────────────────── Type 'exit' to quit ────────────────────────────────────────────╯
 
+
+
+💡 [Enter] 送信 / [Alt+Enter] または [Esc]→[Enter] で改行
+> みかんって30回出力するpythonコードを書いてください。
+📊 Tokens: ~2281 | Exchange: 1/30
+⏱️ Thought completed in 29.1s
+╭──────────────────────────────────────────────── AI Thought ────────────────────────────────────────────────╮
+│ To understand the project layout and identify which files might need editing or updating, I will first     │
+│ read the directory structure.                                                                              │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+📂 Reading directory: .
+ディレクトリ構造を読み込みました。
+
+Action Result:
+Directory structure of '/Users/kanade/dev/Loca' (max_depth=2):
+├── uv.lock
+├── Loca.md
+├── pyproject.toml
+├── README.md
+  ├── [DIR] docs/
+    ├── README_ja.md
+  ├── [DIR] src/
+    ├── [DIR] Loca.egg-info/
+      ├── PKG-INFO
+      ├── SOURCES.txt
+      ├── entry_points.txt
+      ├── requires.txt
+      ├── top_level.txt
+      ├── dependency_links.txt
+    ├── [DIR] loca/
+      ├── config.py
+      ├── __init__.py
+      ├── main.py
+
+📊 Tokens: ~2844 | Exchange: 2/30
+⏱️ Thought completed in 17.3s
+╭──────────────────────────────────────────────── AI Thought ────────────────────────────────────────────────╮
+│ The project structure is now clear. To proceed, I need to understand the current state of the code or any  │
+│ specific requirements for modification. Since no specific task was mentioned, I will start by reading one  │
+│ of the key files, such as 'pyproject.toml', to understand the project dependencies and configuration.      │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+📄 Reading file: pyproject.toml
+内容をメモリに読み込みました。
+
+Action Result:
+--- pyproject.toml の中身 ---
+
+package = true
+
+name = "Loca"
+version = "0.1.0"
+description = "Autonomous CLI agent app (Loca) using LiteLLM and Rich"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "litellm>=1.81.13",  # OpenAI/Anthropic等のAPI抽象化
+    "ollama",            # ローカルLLM用（LiteLLMの裏側で呼ばれることがあります）
+    "rich",              # ターミナルの美しいUI表示用
+    "prompt-toolkit>=3.0.52",
+    "typer",
+    "ddgs>=9.10.0",
+]
+
+
+# ★ ここが超重要！
+# 先ほど main.py の最後に作った `cli` 関数を、グローバルコマンドとして登録します。
+# これでターミナルで `loca` と打つだけで起動するようになります！
+loca = "loca.main:cli"
+
+--- EOF ---
+
+📊 Tokens: ~3589 | Exchange: 3/30
+⏱️ Thought completed in 12.2s
+✏️ Editing file: pyproject.toml
+old_text: version = "0.1.0"
+new_text: version = "0.2.0"
+編集を許可しますか？ : 
 ```bash
 git clone https://github.com/kanade73/Loca.git
 cd Loca
@@ -109,7 +188,7 @@ Locaは以下のツールを自律的に選択し、タスクを遂行します�
 
 ### 🤝 透明な記憶システム
 
-クラウドのブラックボックスな「メモリ機能」と違い、Locaの記憶は `Loca.md` というマークダウンファイルとして手元に存在します。何を覚えているか、何を忘れさせるかを完全にコントロールできます。使えば使うほど、あなた専用の相棒へと育っていきます。
+クラウドのブラックボックスな「メモリ機能」と違い、Locaの記憶は `Loca.md` というマークダウンファイルとして手元に存在します。何を覚えているか、何を忘れさせるかをコントロールできます。使えば使うほど、あなた専用の相棒へと育っていきます。
 
 ```bash
 > /remember Djangoのビューは常にクラスベースで書くこと
