@@ -36,4 +36,5 @@ def print_header(model_name="unknown"):
 
 # テスト実行用
 if __name__ == "__main__":
-    print_header(model_name="qwen2.5-coder:32b")
+    import loca.config as config
+    print_header(model_name=config.DEFAULT_MODEL)

@@ -6,8 +6,11 @@ from loca.ui.display import console, print_error
 from loca.core.llm_client import chat_with_llm
 from loca.core.prompts import get_editor_prompt, get_reviewer_prompt
 from loca.tools.file_ops import write_file
+import loca.config as config
 
-def run_pro_mode(task: str, model_name: str = "qwen2.5-coder:32b", provider: str = "ollama", auto_mode: bool = False):
+def run_pro_mode(task: str, model_name: str = None, provider: str = None, auto_mode: bool = False):
+    model_name = model_name or config.DEFAULT_MODEL
+    provider = provider or config.DEFAULT_PROVIDER
     """EditorとReviewerの2つのAIエージェントを戦わせて高品質なコードを生成するモード"""
     console.print(f"\n[bold magenta]🚀 起動: Pro Agent (Deep Thinking Mode)[/bold magenta]")
     console.print(f"[dim]Task: {task}[/dim]\n")

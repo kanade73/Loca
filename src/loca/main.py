@@ -319,9 +319,10 @@ def main(model_name: str, provider: str):
             needs_user_input = True 
 
 def cli():
+    import loca.config as config
     parser = argparse.ArgumentParser(description="Loca - Autonomous AI Coding Assistant")
-    parser.add_argument("-p", "--provider", type=str, default="ollama", choices=["ollama", "openai", "anthropic", "gemini"], help="LLMのプロバイダー")
-    parser.add_argument("-m", "--model", type=str, default="qwen2.5-coder:32b", help="使用するモデル名")
+    parser.add_argument("-p", "--provider", type=str, default=config.DEFAULT_PROVIDER, choices=["ollama", "openai", "anthropic", "gemini"], help="LLMのプロバイダー")
+    parser.add_argument("-m", "--model", type=str, default=config.DEFAULT_MODEL, help="使用するモデル名")
     
     args = parser.parse_args()
     main(model_name=args.model, provider=args.provider)

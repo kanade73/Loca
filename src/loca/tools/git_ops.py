@@ -1,8 +1,11 @@
 import subprocess
 from loca.ui.display import console
 from loca.core.llm_client import chat_with_llm
+import loca.config as config
 
-def auto_commit(model_name: str = "qwen2.5-coder:32b", provider: str = "ollama"):
+def auto_commit(model_name: str = None, provider: str = None):
+    model_name = model_name or config.DEFAULT_MODEL
+    provider = provider or config.DEFAULT_PROVIDER
     """Gitの変更を解析し、自動でコミットメッセージを生成してコミットする"""
     console.print(f"\n[bold cyan]🐙 Git Auto Commit を開始します...[/bold cyan]")
     

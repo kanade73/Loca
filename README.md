@@ -5,17 +5,33 @@
 [![Ollama](https://img.shields.io/badge/Local_AI-Ollama-black)](https://ollama.com)
 [![LiteLLM](https://img.shields.io/badge/Multi_Provider-LiteLLM-green)](https://github.com/BerriAI/litellm)
 
+**🌐 [日本語](docs/README_ja.md)**
+
 **LOCAL AI · FREE · YOURS**
 
 > I couldn't afford Claude Code. So I built my own.
 
-<img width="867" height="502" alt="スクリーンショット 2026-02-22 11 26 13" src="https://github.com/user-attachments/assets/debf4f8a-107d-465a-af38-19e93208ffc1" />
+<img width="867" height="502" alt="screenshot" src="https://github.com/user-attachments/assets/debf4f8a-107d-465a-af38-19e93208ffc1" />
 
-Loca（ロカ）は、ローカルLLMを使って自律的に思考し、コードを書き、使えば使うほどあなた専用に育っていくCLI型のAIコーディングエージェントです。APIキー不要、課金不要。`uv sync` と `loca` だけで動きます。
+Loca is a CLI-based autonomous AI coding agent that runs entirely on local LLMs. It thinks, writes code, executes commands, and learns your preferences over time — all without API keys or subscriptions. Just `uv sync` and `loca`.
 
 ---
 
-## 🛠️ インストール
+## 🛠️ Installation
+
+### 1. Set up Ollama
+
+Install [Ollama](https://ollama.com) and download the default model.
+
+```bash
+# Install Ollama (macOS)
+brew install ollama
+
+# Download the default model (~4.7GB)
+ollama pull qwen2.5-coder:7b
+```
+
+### 2. Set up Loca
 
 ```bash
 git clone https://github.com/kanade73/Loca.git
@@ -24,134 +40,149 @@ uv sync
 loca
 ```
 
-これだけです。
+That's it. You're ready to go.
 
----
+### Changing the Model
 
-## 💻 コマンド一覧
+The default model is configured in `src/loca/config.py`:
 
-| コマンド | 説明 |
-| --- | --- |
-| 自然言語 | AIが自律的に思考し、ファイル操作やコマンド実行などのアクションを起こします |
-| `/ask <質問>` | アクションを伴わず、AIの知識を引き出すモード。必要に応じて自律的にWeb検索を行います |
-| `/pro <タスク>` | EditorとReviewerの2つのAIによる合議制で、高品質なコードを生成します |
-| `/auto` | AIの行動に対するユーザーの承認をスキップし、完全自律モードに切り替えます |
-| `/clear` | 会話履歴をリセットし、新しいタスクを開始します |
-| `/commit` | Gitの差分を解析し、コミットメッセージを自動生成してコミットします |
-| `/remember <ルール>` | Locaにルールやあなたの好みを記憶させます |
-| `/rules` | 現在記憶しているルールを一覧表示します |
-| `/forget <番号>` | 特定のルールを削除します |
-
----
-
-## ✨ コア機能
-
-### 🛠️ 7つのツール
-
-Locaは以下のツールを自律的に選択し、タスクを遂行します。
-
-| ツール | 説明 |
-| --- | --- |
-| `run_command` | シェルコマンドの実行（ユーザー確認あり） |
-| `read_file` | ファイルの読み込み |
-| `write_file` | ファイルの新規作成・全体上書き |
-| `edit_file` | ファイルの部分編集（差分置換） |
-| `read_directory` | ディレクトリ構造の取得 |
-| `web_search` | DuckDuckGoによるWeb検索 |
-| `none` | タスク完了の宣言 |
-
-### 🤝 透明な記憶システム
-
-クラウドのブラックボックスな「メモリ機能」と違い、Locaの記憶は `Loca.md` というマークダウンファイルとして手元に存在します。何を覚えているか、何を忘れさせるかを完全にコントロールできます。使えば使うほど、あなた専用の相棒へと育っていきます。
-
-```bash
-> /remember Djangoのビューは常にクラスベースで書くこと
-🧠 了解。Loca.md に追記しました。
-
-> /rules
-> /forget 3
+```python
+# src/loca/config.py
+DEFAULT_MODEL = "qwen2.5-coder:7b"   # ← Change this
+DEFAULT_PROVIDER = "ollama"
 ```
 
-### ⚖️ Pro Mode：AI同士の合議制
-
-`/pro` モードでは「コードを生成するEditor AI」と「それを審査するReviewer AI」が内部で議論し、Reviewerが承認するまで自律的に修正を繰り返します。同じモデルでも、役割を分けることで単体より高い精度を引き出します。
-
-### 🔒 安全設計
-
-- **コマンド実行前の確認**: `run_command` や `write_file` は実行前にユーザーの承認を求めます（`/auto` で解除可能）
-- **パスの安全装置**: `/etc`, `~/.ssh` 等のシステムディレクトリへの書き込みを自動でブロックします
-- **セッション管理**: 1セッション30回のやりとり上限で、コンテキストウィンドウの溢れを防ぎます
-
-### 🔌 ローカルファースト、でもクラウドにも対応
-
-デフォルトはローカルの `Ollama` で完全無料・完全プライベートに動作します。必要なときだけ引数一つでクラウドAPIに切り替えられます。
+To use a different model, just **pull it and update config.py**:
 
 ```bash
-# ローカルで実行（デフォルト・無料）
-loca
+# Example: Use a more powerful model (20GB+ VRAM recommended)
+ollama pull qwen2.5-coder:32b
+# → Change DEFAULT_MODEL to "qwen2.5-coder:32b" in config.py
+```
 
-# モデルを指定して実行
+You can also specify a model temporarily via CLI:
+
+```bash
 loca -m qwen2.5-coder:32b
+```
 
-# クラウドAPIで実行
+### Using Cloud APIs
+
+```bash
 export OPENAI_API_KEY="sk-..."
 loca -p openai -m gpt-4o
 ```
 
 ---
 
-## 🌱 Locaを育てる
+## 💻 Commands
 
-`Loca.md` に好みやルールを書いておくと、どんなタスクでも最初からその前提で動いてくれます。
+| Command | Description |
+| --- | --- |
+| Natural language | The AI autonomously thinks and takes actions (file ops, commands, etc.) |
+| `/ask <question>` | Knowledge-only mode — no file changes. Automatically searches the web if needed |
+| `/pro <task>` | Dual-AI mode: an Editor AI writes code, a Reviewer AI critiques it, iterating until approved |
+| `/auto` | Toggles full-auto mode — skips all user confirmations |
+| `/clear` | Resets conversation history and starts a fresh task |
+| `/commit` | Analyzes git diff, auto-generates a commit message, and commits |
+| `/remember <rule>` | Teaches Loca a rule or preference |
+| `/rules` | Lists all remembered rules |
+| `/forget <number>` | Removes a specific rule |
+
+---
+
+## ✨ Core Features
+
+### 🛠️ 7 Built-in Tools
+
+Loca autonomously selects from these tools to complete your tasks:
+
+| Tool | Description |
+| --- | --- |
+| `run_command` | Execute shell commands (with user confirmation) |
+| `read_file` | Read file contents |
+| `write_file` | Create or overwrite files |
+| `edit_file` | Partial file edits (find & replace) |
+| `read_directory` | Explore project structure |
+| `web_search` | Search via DuckDuckGo |
+| `none` | Signal task completion |
+
+### 🤝 Transparent Memory System
+
+Unlike cloud-based "memory" features hidden behind APIs, Loca's memory is a plain markdown file (`Loca.md`) sitting in your project root. You can read it, edit it, or delete it anytime. Full control, zero magic.
+
+```bash
+> /remember Always use class-based views in Django
+🧠 Got it. Added to Loca.md.
+
+> /rules
+> /forget 3
+```
+
+### ⚖️ Pro Mode: Dual-AI Collaboration
+
+In `/pro` mode, two AI agents debate internally — an **Editor** generates code, and a **Reviewer** critiques it. The cycle repeats until the Reviewer approves. Even with the same underlying model, role separation produces noticeably better output.
+
+### 🔒 Safety by Design
+
+- **Confirmation before execution**: `run_command` and `write_file` require user approval (toggle with `/auto`)
+- **Path protection**: Writes to system directories (`/etc`, `~/.ssh`, etc.) are automatically blocked
+- **Session limits**: 30 exchanges per session to prevent context window overflow
+
+---
+
+## 🌱 Train Your Loca
+
+Add rules and preferences to `Loca.md` and Loca will follow them in every task:
 
 ```markdown
-# Loca.md の例
-- パッケージ管理は必ず uv を使うこと
-- UIはシンプルでモダンなデザインにすること
-- コミットメッセージは日本語で書くこと
+# Loca.md example
+- Always use uv for package management
+- Keep UI minimal and modern
+- Write commit messages in English
 ```
 
 ---
 
-## 📁 フォルダ構成
+## 📁 Project Structure
 
 ```
 Loca/
 ├── src/loca/
-│   ├── config.py      # プロジェクトルートの解決、Loca.mdのパス管理
-│   ├── main.py        # エントリーポイント、コマンドルーティング、メッセージ管理
+│   ├── config.py      # Default model/provider, path management
+│   ├── main.py        # Entry point, command routing, message management
 │   ├── core/
-│   │   ├── llm_client.py   # LiteLLM経由のLLM通信・JSONパース
-│   │   ├── prompts.py      # システムプロンプト・ツール定義
-│   │   ├── memory.py       # Loca.mdの読み書き（記憶システム）
-│   │   └── pro_agent.py    # /pro モードのEditor/Reviewerロジック
+│   │   ├── llm_client.py   # LLM communication via LiteLLM
+│   │   ├── prompts.py      # System prompts & tool definitions
+│   │   ├── memory.py       # Loca.md read/write (memory system)
+│   │   └── pro_agent.py    # /pro mode Editor/Reviewer logic
 │   ├── tools/
-│   │   ├── commander.py    # シェルコマンドの安全な実行
-│   │   ├── file_ops.py     # ファイル読み書き・パス安全検証
-│   │   ├── git_ops.py      # Gitコミット・差分解析
-│   │   └── web_search.py   # DuckDuckGo検索
+│   │   ├── commander.py    # Safe shell command execution
+│   │   ├── file_ops.py     # File I/O with path validation
+│   │   ├── git_ops.py      # Git commit & diff analysis
+│   │   └── web_search.py   # DuckDuckGo search
 │   └── ui/
-│       ├── display.py      # Rich UIコンポーネント・入力処理
-│       └── header.py       # 起動時ヘッダー表示
-├── pyproject.toml     # 依存関係とCLIコマンド定義
-└── Loca.md      # Locaの記憶（あなたが育てるマークダウン）
+│       ├── display.py      # Rich UI components
+│       └── header.py       # Startup header
+├── pyproject.toml     # Dependencies & CLI entrypoint
+└── Loca.md            # Loca's memory (your rules, your data)
 ```
 
 ---
 
-## 🔧 技術スタック
+## 🔧 Tech Stack
 
-| 技術 | 用途 |
+| Technology | Purpose |
 | --- | --- |
-| [LiteLLM](https://github.com/BerriAI/litellm) | LLM APIの抽象化（Ollama / OpenAI / Anthropic / Gemini を統一的に扱う） |
-| [Ollama](https://ollama.com) | ローカルLLMの実行基盤（デフォルト） |
-| [Rich](https://github.com/Textualize/rich) | ターミナルUIの描画 |
-| [prompt-toolkit](https://github.com/prompt-toolkit/python-prompt-toolkit) | 入力補完・履歴・複数行入力 |
-| [ddgs](https://github.com/deedy5/duckduckgo_search) | DuckDuckGo Web検索 |
-| [uv](https://github.com/astral-sh/uv) | パッケージ管理 |
+| [LiteLLM](https://github.com/BerriAI/litellm) | Unified LLM API (Ollama / OpenAI / Anthropic / Gemini) |
+| [Ollama](https://ollama.com) | Local LLM runtime (default) |
+| [Rich](https://github.com/Textualize/rich) | Terminal UI rendering |
+| [prompt-toolkit](https://github.com/prompt-toolkit/python-prompt-toolkit) | Input history, multi-line editing |
+| [ddgs](https://github.com/deedy5/duckduckgo_search) | DuckDuckGo web search |
+| [uv](https://github.com/astral-sh/uv) | Fast Python package management |
 
 ---
 
-## ライセンス
+## License
 
 MIT
