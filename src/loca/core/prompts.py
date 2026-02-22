@@ -1,14 +1,13 @@
 import os
 import platform
 import textwrap
-from pathlib import Path
+import loca.config as config
 
 def _get_project_rules() -> str:
     """
-    プロジェクトのルール(loca_rules.md)を読み込み、XMLタグで囲んで返す共通関数。
+    プロジェクトのルール(Loca.md)を読み込み、XMLタグで囲んで返す共通関数。
     """
-    base_dir = Path(__file__).resolve().parent.parent.parent
-    rules_file = base_dir / "loca_rules.md"
+    rules_file = config.get_rules_path()
     
     if rules_file.exists():
         try:
@@ -50,7 +49,7 @@ def get_system_prompt(is_ask_mode: bool = False) -> dict:
             {custom_rules}
             
             # Available Actions
-            You have 6 tools available. Choose ONLY ONE action per response based on the user's request.
+            You have 7 tools available. Choose ONLY ONE action per response based on the user's request.
 
             1. run_command: Execute a shell command.
                 args format: {{"command": "the shell command to run"}}
@@ -58,11 +57,13 @@ def get_system_prompt(is_ask_mode: bool = False) -> dict:
                 args format: {{"filepath": "path/to/file"}}
             3. write_file: Write or overwrite the ENTIRE content of a file. Do not use for partial edits.
                 args format: {{"filepath": "...", "content": "the complete new file content"}}
-            4. read_directory: Get the tree structure of a directory to understand the project layout.
+            4. edit_file: Replace a specific part of an existing file. Use this for small, targeted edits instead of rewriting the whole file.
+                args format: {{"filepath": "...", "old_text": "exact text to find", "new_text": "replacement text"}}
+            5. read_directory: Get the tree structure of a directory to understand the project layout.
                 args format: {{"dir_path": "path/to/directory (use '.' for current directory)"}}
-            5. web_search: Search the web for up-to-date information, documentation, or solutions to errors.
+            6. web_search: Search the web for up-to-date information, documentation, or solutions to errors.
                 args format: {{"query": "the search query string"}}
-            6. none: Use this when the task is complete.
+            7. none: Use this when the task is complete.
                 args format: {{}}
 
             # Strict Rules
@@ -72,11 +73,12 @@ def get_system_prompt(is_ask_mode: bool = False) -> dict:
             4. NEVER use single quotes (') to enclose JSON string values. You MUST use double quotes (") and escape inner double quotes (e.g., "content": "print(\\"Hello\\")").
             5. When installing Python packages, ALWAYS use `uv pip install` instead of standard `pip`.
             6. For multi-line text in JSON (like file content), use explicit `\\n` characters for newlines. DO NOT use actual physical line breaks inside the JSON string.
+            7. If you are unsure about the current content of a file, ALWAYS use `read_file` to check before editing or overwriting it. Do not rely on memory from earlier in the conversation.
             
             # Output Format
             {{
                  "thought": "Your thinking process in English. Briefly explain why you chose the action.",
-                 "action": "run_command" | "read_file" | "write_file" | "read_directory" | "web_search" | "none",
+                 "action": "run_command" | "read_file" | "write_file" | "edit_file" | "read_directory" | "web_search" | "none",
                  "args": {{ ... }}
             }}
         """).strip()

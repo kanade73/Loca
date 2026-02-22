@@ -1,7 +1,7 @@
-from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 from rich.align import Align
+from loca.ui.display import console
 
 # スラッシュやバックスラッシュが崩れないよう raw文字列 (r"...") を使用
 ASCII_ART = r"""
@@ -15,8 +15,6 @@ ASCII_ART = r"""
 """
 
 def print_header(model_name="unknown"):
-    console = Console()
-
     # アスキーアート部分（シアン色で発光）
     title = Text(ASCII_ART, style="bold cyan")
     

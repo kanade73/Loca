@@ -1,6 +1,24 @@
 import os
 from pathlib import Path
 
+# 書き込みを禁止する危険なディレクトリ
+DANGEROUS_PATHS = [
+    "/etc", "/usr", "/bin", "/sbin", "/var", "/boot", "/dev", "/proc", "/sys",
+    "/System", "/Library",  # macOS系
+    os.path.expanduser("~/.ssh"),
+    os.path.expanduser("~/.gnupg"),
+    os.path.expanduser("~/.config"),
+    os.path.expanduser("~/.aws"),
+]
+
+def is_safe_path(filepath: str) -> tuple[bool, str]:
+    """書き込み先のパスが安全かどうかを検証する"""
+    abs_path = os.path.abspath(filepath)
+    for danger in DANGEROUS_PATHS:
+        if abs_path.startswith(danger):
+            return False, f"安全装置: '{abs_path}' はシステムディレクトリ ({danger}) 内のため書き込みを拒否しました。"
+    return True, ""
+
 def read_file(filepath: str) -> str:
     """指定されたファイルを読み込む"""
     if not os.path.exists(filepath):
@@ -16,6 +34,9 @@ def edit_file(filepath: str, old_text: str, new_text: str) -> str:
     """ファイル内の特定の文字列を、新しい文字列に置換する"""
     if not os.path.exists(filepath):
         return f"Error: ファイル '{filepath}' が見つかりません。"
+    safe, msg = is_safe_path(filepath)
+    if not safe:
+        return msg
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -36,6 +57,9 @@ def edit_file(filepath: str, old_text: str, new_text: str) -> str:
 
 def write_file(filepath: str, content: str) -> str:
     """ファイル全体を新しい内容で上書き（または新規作成）する"""
+    safe, msg = is_safe_path(filepath)
+    if not safe:
+        return msg
     try:
         # ディレクトリが存在しない場合は作成する
         os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)

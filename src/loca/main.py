@@ -2,12 +2,9 @@ import time
 import argparse
 from rich.panel import Panel
 
-# --- Loca 初期化 ---
-import loca.config as config
-config.setup_environment()
 
 # --- コア機能 ---
-from loca.core.llm_client import chat_with_llm, extract_json_from_text
+from loca.core.llm_client import chat_with_llm, stream_chat_with_llm, extract_json_from_text, estimate_tokens
 from loca.core.prompts import get_system_prompt
 from loca.core.memory import MemoryManager
 from loca.core.pro_agent import run_pro_mode
@@ -15,12 +12,30 @@ from loca.core.pro_agent import run_pro_mode
 # --- ツール ---
 from loca.tools.web_search import search_web
 from loca.tools.commander import execute_command
-from loca.tools.file_ops import read_file, write_file, read_directory
+from loca.tools.file_ops import read_file, write_file, edit_file, read_directory
 from loca.tools.git_ops import auto_commit
 
 # --- UI ---
 from loca.ui.header import print_header
 from loca.ui.display import console, print_thought, print_command, print_error, get_user_input
+from rich.live import Live
+from rich.markdown import Markdown
+
+# ==========================================
+# メッセージ管理（コンテキストウィンドウ溢れ防止）
+# ==========================================
+MAX_EXCHANGES = 30       # 1セッション中の最大やりとり回数
+MAX_MESSAGES = 60        # messagesリストの上限（これを超えたら古いものを捨てる）
+
+def trim_messages(messages: list) -> list:
+    """コンテキストウィンドウのオーバーフローを防ぐだけの安全装置。"""
+    if len(messages) <= MAX_MESSAGES:
+        return messages
+    
+    # system_prompt (messages[0]) + 直近のやりとりだけ残す
+    trimmed = [messages[0]] + messages[-(MAX_MESSAGES - 1):]
+    console.print(f"[dim]📎 コンテキスト整理: 古いメッセージを切り捨てました ({len(messages)} → {len(trimmed)})[/dim]")
+    return trimmed
 
 # ==========================================
 # メインループ
@@ -36,12 +51,17 @@ def main(model_name: str, provider: str):
     messages = [sys_prompt]
     
     if "<project_guidelines>" in sys_prompt["content"]:
-        console.print("[bold cyan]🧠 Locaの記憶(loca_rules.md)をロードしました！[/bold cyan]\n")
+        console.print("[bold cyan]🧠 Locaの記憶(Loca.md)をロードしました！[/bold cyan]\n")
         
     needs_user_input = True 
     auto_mode = False
+    is_ask_mode = False
+    exchange_count = 0  # LLM呼び出し回数カウンター
 
     while True:
+        # --- メッセージ管理 ---
+        messages = trim_messages(messages)
+        
         # --- ユーザー入力フェーズ ---
         if needs_user_input:
             try:
@@ -65,7 +85,18 @@ def main(model_name: str, provider: str):
                 needs_user_input = True
                 continue
 
+            if user_input.lower().strip() == "/clear":
+                sys_prompt = get_system_prompt()
+                messages = [sys_prompt]
+                exchange_count = 0
+                console.print("\n[bold cyan]🔄 会話をリセットしました。新しいタスクを入力してください。[/bold cyan]\n")
+                needs_user_input = True
+                continue
+
             is_ask_mode = False
+            # /ask 後にプロンプトが戻らないバグ防止: 毎回通常モードに復元する
+            messages[0] = get_system_prompt()
+            
             if user_input.startswith("/ask"):
                 is_ask_mode = True
                 question = user_input[4:].strip()
@@ -116,11 +147,32 @@ def main(model_name: str, provider: str):
                 continue
                 
         # --- AI思考フェーズ ---
-        start_time = time.time()
-        with console.status("[bold cyan]AI is thinking...", spinner="dots"):
-            response_data = chat_with_llm(messages, model_name=model_name, provider=provider, is_ask_mode=is_ask_mode)
+        # 交換回数チェック
+        exchange_count += 1
+        if exchange_count > MAX_EXCHANGES:
+            console.print(f"\n[bold yellow]⚠️ セッションの上限 ({MAX_EXCHANGES}回) に達しました。コンテキストをリセットします。[/bold yellow]")
+            console.print("[dim]新しいタスクを入力してください。[/dim]\n")
+            sys_prompt = get_system_prompt()
+            messages = [sys_prompt]
+            exchange_count = 0
+            needs_user_input = True
+            continue
         
+        # トークン数の概算表示
+        token_count = estimate_tokens(messages)
+        console.print(f"[dim]📊 Tokens: ~{token_count} | Exchange: {exchange_count}/{MAX_EXCHANGES}[/dim]")
+        
+        start_time = time.time()
+        
+        # /ask モード: ストリーミング表示
         if is_ask_mode:
+            raw_text = ""
+            parsed_json = None
+            
+            # まず通常のレスポンスを取得（web_searchアクションの判定のため）
+            with console.status("[bold cyan]AI is thinking...", spinner="dots"):
+                response_data = chat_with_llm(messages, model_name=model_name, provider=provider, is_ask_mode=True)
+            
             raw_text = response_data.get("raw_response", "")
             parsed_json = extract_json_from_text(raw_text)
             
@@ -132,16 +184,40 @@ def main(model_name: str, provider: str):
                     search_result = search_web(query)
                     messages.append({"role": "assistant", "content": raw_text})
                     messages.append({"role": "user", "content": f"検索結果:\n{search_result}\n\nこの結果を踏まえて、最初の質問にマークダウンで直接答えてください。"})
-                    
-                    final_response = chat_with_llm(messages, model_name=model_name, provider=provider, is_ask_mode=True)
-                    raw_text = final_response.get("raw_response", "検索結果の解釈に失敗しました。")
-                    elapsed_time = time.time() - start_time
+                
+                # 検索結果を踏まえた回答をストリーミングで表示
+                raw_text = ""
+                console.print()
+                with Live("", console=console, refresh_per_second=8) as live:
+                    for chunk in stream_chat_with_llm(messages, model_name=model_name, provider=provider):
+                        raw_text += chunk
+                        live.update(Markdown(raw_text))
+            else:
+                # 通常の/ask回答: ストリーミングで再度生成
+                raw_text = ""
+                console.print()
+                with Live("", console=console, refresh_per_second=8) as live:
+                    for chunk in stream_chat_with_llm(messages, model_name=model_name, provider=provider):
+                        raw_text += chunk
+                        live.update(Markdown(raw_text))
 
-            console.print(f"[dim]⏱️ Answered in {elapsed_time:.1f}s[/dim]")
-            console.print(Panel(raw_text, title="[bold blue]Loca[/bold blue]", border_style="blue"))
+            elapsed_time = time.time() - start_time
+            console.print(f"\n[dim]⏱️ Answered in {elapsed_time:.1f}s[/dim]")
             messages.append({"role": "assistant", "content": raw_text})
             needs_user_input = True
             continue
+
+        # 通常モード: JSONレスポンス（非ストリーミング）
+        with console.status("[bold cyan]AI is thinking...", spinner="dots"):
+            response_data = chat_with_llm(messages, model_name=model_name, provider=provider, is_ask_mode=False)
+        
+        # JSONパース失敗時の自動リトライ（1回まで）
+        if "error" in response_data and response_data.get("error") == "JSON_PARSE_ERROR":
+            console.print("[dim]🔄 JSONパースに失敗しました。自動リトライ中...[/dim]")
+            messages.append({"role": "assistant", "content": response_data.get("raw_response", "")})
+            messages.append({"role": "user", "content": "あなたの前の応答はJSONとしてパースできませんでした。指定されたJSONフォーマットで再度出力してください。"})
+            with console.status("[bold cyan]AI is retrying...", spinner="dots"):
+                response_data = chat_with_llm(messages, model_name=model_name, provider=provider, is_ask_mode=False)
 
         if "error" in response_data:
             print_error("うまく解釈できませんでした。")
@@ -184,7 +260,7 @@ def main(model_name: str, provider: str):
                 confirm = 'y'
                 console.print("[dim]🤖 Auto Mode: 自動で書き込みを許可しました。[/dim]")
             else:
-                confirm = input("編集を許可しますか？ [y/N]: ").strip().lower()
+                confirm = console.input("[bold]編集を許可しますか？ [y/N]: [/bold]").strip().lower()
                 
             if confirm == 'y':
                 result_output = write_file(filepath, content)
@@ -192,7 +268,28 @@ def main(model_name: str, provider: str):
             else:
                 result_output = "キャンセルされました。"
                 console.print(f"[dim]書き込みをキャンセルしました。[/dim]")
-        
+
+        elif action == "edit_file":
+            filepath = args.get("filepath", "")
+            old_text = args.get("old_text", "")
+            new_text = args.get("new_text", "")
+            console.print(f"[bold yellow]✏️ Editing file:[/bold yellow] {filepath}")
+            console.print(f"[dim]old_text: {old_text[:100]}{'...' if len(old_text) > 100 else ''}[/dim]")
+            console.print(f"[dim]new_text: {new_text[:100]}{'...' if len(new_text) > 100 else ''}[/dim]")
+            
+            if auto_mode:
+                confirm = 'y'
+                console.print("[dim]🤖 Auto Mode: 自動で編集を許可しました。[/dim]")
+            else:
+                confirm = console.input("[bold]編集を許可しますか？ [y/N]: [/bold]").strip().lower()
+            
+            if confirm == 'y':
+                result_output = edit_file(filepath, old_text, new_text)
+                console.print(f"[dim]ファイルを編集しました。[/dim]")
+            else:
+                result_output = "キャンセルされました。"
+                console.print(f"[dim]編集をキャンセルしました。[/dim]")
+
         elif action == "read_directory":
             dir_path = args.get("dir_path", ".")
             console.print(f"[bold blue]📂 Reading directory:[/bold blue] {dir_path}")
