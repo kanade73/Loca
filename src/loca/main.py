@@ -4,7 +4,7 @@ from rich.panel import Panel
 
 
 # --- コア機能 ---
-from loca.core.llm_client import chat_with_llm, extract_json_from_text
+from loca.core.llm_client import chat_with_llm, stream_chat_with_llm, extract_json_from_text, estimate_tokens
 from loca.core.prompts import get_system_prompt
 from loca.core.memory import MemoryManager
 from loca.core.pro_agent import run_pro_mode
@@ -18,6 +18,8 @@ from loca.tools.git_ops import auto_commit
 # --- UI ---
 from loca.ui.header import print_header
 from loca.ui.display import console, print_thought, print_command, print_error, get_user_input
+from rich.live import Live
+from rich.markdown import Markdown
 
 # ==========================================
 # メッセージ管理（コンテキストウィンドウ溢れ防止）
@@ -80,6 +82,14 @@ def main(model_name: str, provider: str):
                 auto_mode = not auto_mode
                 status = "ON (全自動・承認スキップ)" if auto_mode else "OFF (都度確認)"
                 console.print(f"\n[bold yellow]🤖 Auto Mode: {status}[/bold yellow]\n")
+                needs_user_input = True
+                continue
+
+            if user_input.lower().strip() == "/clear":
+                sys_prompt = get_system_prompt()
+                messages = [sys_prompt]
+                exchange_count = 0
+                console.print("\n[bold cyan]🔄 会話をリセットしました。新しいタスクを入力してください。[/bold cyan]\n")
                 needs_user_input = True
                 continue
 
@@ -148,11 +158,21 @@ def main(model_name: str, provider: str):
             needs_user_input = True
             continue
         
-        start_time = time.time()
-        with console.status("[bold cyan]AI is thinking...", spinner="dots"):
-            response_data = chat_with_llm(messages, model_name=model_name, provider=provider, is_ask_mode=is_ask_mode)
+        # トークン数の概算表示
+        token_count = estimate_tokens(messages)
+        console.print(f"[dim]📊 Tokens: ~{token_count} | Exchange: {exchange_count}/{MAX_EXCHANGES}[/dim]")
         
+        start_time = time.time()
+        
+        # /ask モード: ストリーミング表示
         if is_ask_mode:
+            raw_text = ""
+            parsed_json = None
+            
+            # まず通常のレスポンスを取得（web_searchアクションの判定のため）
+            with console.status("[bold cyan]AI is thinking...", spinner="dots"):
+                response_data = chat_with_llm(messages, model_name=model_name, provider=provider, is_ask_mode=True)
+            
             raw_text = response_data.get("raw_response", "")
             parsed_json = extract_json_from_text(raw_text)
             
@@ -164,16 +184,40 @@ def main(model_name: str, provider: str):
                     search_result = search_web(query)
                     messages.append({"role": "assistant", "content": raw_text})
                     messages.append({"role": "user", "content": f"検索結果:\n{search_result}\n\nこの結果を踏まえて、最初の質問にマークダウンで直接答えてください。"})
-                    
-                    final_response = chat_with_llm(messages, model_name=model_name, provider=provider, is_ask_mode=True)
-                    raw_text = final_response.get("raw_response", "検索結果の解釈に失敗しました。")
+                
+                # 検索結果を踏まえた回答をストリーミングで表示
+                raw_text = ""
+                console.print()
+                with Live("", console=console, refresh_per_second=8) as live:
+                    for chunk in stream_chat_with_llm(messages, model_name=model_name, provider=provider):
+                        raw_text += chunk
+                        live.update(Markdown(raw_text))
+            else:
+                # 通常の/ask回答: ストリーミングで再度生成
+                raw_text = ""
+                console.print()
+                with Live("", console=console, refresh_per_second=8) as live:
+                    for chunk in stream_chat_with_llm(messages, model_name=model_name, provider=provider):
+                        raw_text += chunk
+                        live.update(Markdown(raw_text))
 
             elapsed_time = time.time() - start_time
-            console.print(f"[dim]⏱️ Answered in {elapsed_time:.1f}s[/dim]")
-            console.print(Panel(raw_text, title="[bold blue]Loca[/bold blue]", border_style="blue"))
+            console.print(f"\n[dim]⏱️ Answered in {elapsed_time:.1f}s[/dim]")
             messages.append({"role": "assistant", "content": raw_text})
             needs_user_input = True
             continue
+
+        # 通常モード: JSONレスポンス（非ストリーミング）
+        with console.status("[bold cyan]AI is thinking...", spinner="dots"):
+            response_data = chat_with_llm(messages, model_name=model_name, provider=provider, is_ask_mode=False)
+        
+        # JSONパース失敗時の自動リトライ（1回まで）
+        if "error" in response_data and response_data.get("error") == "JSON_PARSE_ERROR":
+            console.print("[dim]🔄 JSONパースに失敗しました。自動リトライ中...[/dim]")
+            messages.append({"role": "assistant", "content": response_data.get("raw_response", "")})
+            messages.append({"role": "user", "content": "あなたの前の応答はJSONとしてパースできませんでした。指定されたJSONフォーマットで再度出力してください。"})
+            with console.status("[bold cyan]AI is retrying...", spinner="dots"):
+                response_data = chat_with_llm(messages, model_name=model_name, provider=provider, is_ask_mode=False)
 
         if "error" in response_data:
             print_error("うまく解釈できませんでした。")

@@ -75,3 +75,37 @@ def chat_with_llm(messages: list, model_name: str, provider: str = "ollama", is_
             "error": "LLM_CONNECTION_ERROR",
             "raw_response": f"LLMとの通信に失敗しました。\nモデル: {provider}/{model_name}\n詳細: {str(e)}"
         }
+
+
+def stream_chat_with_llm(messages: list, model_name: str, provider: str = "ollama"):
+    """
+    /askモード専用: LLMのレスポンスをストリーミングで返すジェネレータ関数。
+    各チャンクのテキストを逐次 yield する。
+    """
+    try:
+        litellm_model = f"{provider}/{model_name}" if provider != "openai" else model_name
+        
+        response = litellm.completion(
+            model=litellm_model,
+            messages=messages,
+            temperature=0.1,
+            stream=True
+        )
+        
+        for chunk in response:
+            content = chunk.choices[0].delta.content
+            if content:
+                yield content
+                
+    except Exception as e:
+        yield f"\n\nストリーミング中にエラーが発生しました: {e}"
+
+
+def estimate_tokens(messages: list) -> int:
+    """
+    メッセージリストの概算トークン数を返す。
+    日本語は1文字≈1.5トークン、英語は4文字≈1トークンの簡易推定。
+    """
+    total_chars = sum(len(m.get("content", "")) for m in messages)
+    # 日英混在を想定し、1文字≈1トークンで概算（ざっくり）
+    return total_chars
