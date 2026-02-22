@@ -1,16 +1,20 @@
 # 🧠 Loca - Autonomous AI Coding Assistant
 
-![Python](https://img.shields.io/badge/Python-3.12%2B-blue)
-![uv](https://img.shields.io/badge/Package_Manager-uv-purple)
-![Ollama](https://img.shields.io/badge/Local_AI-Ollama-black)
-![LiteLLM](https://img.shields.io/badge/Multi_Provider-LiteLLM-green)
+[![Python](https://img.shields.io/badge/Python-3.12%2B-blue)](https://python.org)
+[![uv](https://img.shields.io/badge/Package_Manager-uv-purple)](https://github.com/astral-sh/uv)
+[![Ollama](https://img.shields.io/badge/Local_AI-Ollama-black)](https://ollama.com)
+[![LiteLLM](https://img.shields.io/badge/Multi_Provider-LiteLLM-green)](https://github.com/BerriAI/litellm)
 
 **LOCAL AI · FREE · YOURS**
 
-Loca（ロカ）は、あなたのローカル環境で自律的に思考し、コードを書き、共に成長するCLI型のAIコーディングエージェントです。
+> I couldn't afford Claude Code. So I built my own.
+
+Loca（ロカ）は、ローカルLLMを使って自律的に思考し、コードを書き、使えば使うほどあなた専用に育っていくCLI型のAIコーディングエージェントです。APIキー不要、課金不要。`uv sync`と`loca`だけで動きます。
 
 ---
-## フォルダ構成
+
+## 📁 フォルダ構成
+
 ```
 Loca/
 ├── src/loca/
@@ -19,58 +23,90 @@ Loca/
 │   ├── ui/           # AIの顔 (ターミナル描画, ヘッダー表示)
 │   └── main.py       # エントリーポイント・ルーティング
 ├── pyproject.toml    # 依存関係とCLIコマンド定義
-└── loca_rules.md     # Locaの記憶（動的に更新されるマークダウン）
+└── loca_rules.md     # Locaの記憶（あなたが育てるマークダウン）
 ```
 
+---
 
-## 🛠️ インストール (Installation)
-パッケージマネージャーuvを使用してダウンロードします。
+## 🛠️ インストール
+
 ```bash
-# リポジトリのクローン
-git clone [https://github.com/あなたのユーザー名/Loca.git](https://github.com/あなたのユーザー名/Loca.git)
+git clone https://github.com/kanade73/Loca.git
 cd Loca
-
-# 依存関係のインストールとCLIコマンドの登録
-uv pip install -e .
-
-# 起動
+uv sync
 loca
 ```
 
-## 💻 コマンド一覧 (Commands)
-Loca起動後、プロンプトに対して自然言語で指示を出すか、以下の専用コマンドを使用できます。
+これだけです。
 
-| コマンド           | 説明                                                                                       |
-|--------------------|------------------------------------------------------------------------------------------|
-| 自然言語           | AIが自律的に思考し、ファイル操作やコマンド実行などのアクションを起こします。               |
-| /ask <質問>        | アクション（ファイル操作等）を伴わず、純粋にAIの知識のみを引き出して爆速で回答を得るモード。必要に応じて自律的にWeb検索を行います。 |
-| /pro <タスク>      | EditorとReviewerの2つのAIによる合議制で、高品質なコードやプロジェクト構成を生成します。   |
-| /auto              | AIの行動に対するユーザーの承認（y/N）をスキップし、完全自律モードに切り替えます。         |
-| /commit            | Gitの差分を解析し、最適なコミットメッセージを自動生成してコミットします。                 |
-| /remember <ルール>     | Locaにプロジェクトのルールやあなたの好みを記憶させます。                                   |
-| /rules             | 現在記憶しているルールを一覧表示します。                                                     |
-| /forget <番号>     | 特定のルールを削除します。                                                                   |
+---
 
-## ✨ 強みとコア機能 (Key Features)
+## 💻 コマンド一覧
 
-### 1. 🤝 透過的で操作可能な記憶システム (Transparent Memory System)
-クラウドAPIの不透明な「メモリ機能」に依存せず、記憶をローカルのマークダウンファイル（`loca_rules.md`）として管理します。
-ユーザーはコマンド一つでAIに「掟」を教え込み、不要になったら忘れさせることができます。使えば使うほど、**「あなた専用の右腕」**へと育ちます。
-- `/remember <掟>`: AIに新しいルールを学習させる
-- `/rules`: 現在の脳内ルールを一覧表示
-- `/forget <番号>`: 特定のルールを削除する
+| コマンド | 説明 |
+| --- | --- |
+| 自然言語 | AIが自律的に思考し、ファイル操作やコマンド実行などのアクションを起こします |
+| `/ask <質問>` | アクションを伴わず、AIの知識を引き出すモード。必要に応じて自律的にWeb検索を行います |
+| `/pro <タスク>` | EditorとReviewerの2つのAIによる合議制で、高品質なコードを生成します |
+| `/auto` | AIの行動に対するユーザーの承認をスキップし、完全自律モードに切り替えます |
+| `/commit` | Gitの差分を解析し、コミットメッセージを自動生成してコミットします |
+| `/remember <ルール>` | Locaにルールやあなたの好みを記憶させます |
+| `/rules` | 現在記憶しているルールを一覧表示します |
+| `/forget <番号>` | 特定のルールを削除します |
 
-### 2. ⚖️ Pro Mode: AI同士の合議制アーキテクチャ (Multi-Agent Debate)
-複雑なタスクには `/pro` モードが威力を発揮します。
-「コードを生成するEditor AI」と「それを厳格に審査するReviewer AI」の2つのエージェントが内部で議論し、Reviewerが「承認（Approve）」を出すまで自律的に修正を繰り返すことで、高品質なプロジェクト構造を出力します。
+---
 
-### 3. 🔌 マルチプロバイダー＆ローカルファースト (Facade Pattern)
-`LiteLLM`を活用したファサードパターンにより、プロバイダーごとのAPIの差異を完全に吸収しています。
-デフォルトではローカルの `Ollama`（完全無料・セキュア）で動作し、必要に応じて引数一つで `OpenAI` や `Anthropic` に脳みそを切り替えることが可能です。
+## ✨ コア機能
+
+### 🤝 透明な記憶システム
+
+クラウドのブラックボックスな「メモリ機能」と違い、Locaの記憶は`loca_rules.md`というマークダウンファイルとして手元に存在します。何を覚えているか、何を忘れさせるかを完全にコントロールできます。使えば使うほど、あなた専用の相棒へと育っていきます。
+
 ```bash
-# ローカルで実行（デフォルト）
-$ loca -m qwen2.5-coder:32b
+> /remember Djangoのビューは常にクラスベースで書くこと
+🧠 了解。loca_rules.md に追記しました。
+
+> /rules
+> /forget 3
+```
+
+### ⚖️ Pro Mode：AI同士の合議制
+
+`/pro`モードでは「コードを生成するEditor AI」と「それを審査するReviewer AI」が内部で議論し、Reviewerが承認するまで自律的に修正を繰り返します。同じモデルでも、役割を分けることで単体より高い精度を引き出します。
+
+### 🔌 ローカルファースト、でもクラウドにも対応
+
+デフォルトはローカルの`Ollama`で完全無料・完全プライベートに動作します。必要なときだけ引数一つでクラウドAPIに切り替えられます。
+
+```bash
+# ローカルで実行（デフォルト・無料）
+loca
+
+# モデルを指定して実行
+loca -m qwen2.5-coder:32b
 
 # クラウドAPIで実行
-$export OPENAI_API_KEY="sk-..."$ loca -p openai -m gpt-4o
+export OPENAI_API_KEY="sk-..."
+loca -p openai -m gpt-4o
 ```
+
+---
+
+## 🌱 Locaを育てる
+
+`loca_rules.md`に好みやルールを書いておくと、どんなタスクでも最初からその前提で動いてくれます。
+
+```markdown
+# loca_rules.md の例
+- パッケージ管理は必ず uv を使うこと
+- UIはシンプルでモダンなデザインにすること
+- コミットメッセージは日本語で書くこと
+```
+
+プロジェクトごとに育て方を変えることも、`~/.loca/profile.md`でグローバルな好みを定義することもできます。
+
+---
+
+## ライセンス
+
+MIT
