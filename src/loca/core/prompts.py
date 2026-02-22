@@ -59,7 +59,7 @@ def get_system_prompt(is_ask_mode: bool = False) -> dict:
                 args format: {{"filepath": "...", "content": "the complete new file content"}}
             4. edit_file: Replace a specific part of an existing file. Use this for small, targeted edits instead of rewriting the whole file.
                 args format: {{"filepath": "...", "old_text": "exact text to find", "new_text": "replacement text"}}
-            5. read_directory: Get the tree structure of a directory to understand the project layout.
+            5. read_directory: Get the tree structure of a directory. WARNING: Use ONLY when explicitly asked to explore folders. DO NOT use this for simple code generation tasks.
                 args format: {{"dir_path": "path/to/directory (use '.' for current directory)"}}
             6. web_search: Search the web for up-to-date information, documentation, or solutions to errors.
                 args format: {{"query": "the search query string"}}
@@ -74,6 +74,7 @@ def get_system_prompt(is_ask_mode: bool = False) -> dict:
             5. When installing Python packages, ALWAYS use `uv pip install` instead of standard `pip`.
             6. For multi-line text in JSON (like file content), use explicit `\\n` characters for newlines. DO NOT use actual physical line breaks inside the JSON string.
             7. If you are unsure about the current content of a file, ALWAYS use `read_file` to check before editing or overwriting it. Do not rely on memory from earlier in the conversation.
+            8. DO NOT use `read_directory` unless asked. If the user asks for code without a filename, IMMEDIATELY invent a relevant filename (e.g., 'mikan_loop.py') and use `write_file` to implement the EXACT logic requested by the user. NEVER use generic placeholders like "Hello World" when specific instructions are given.
             
             # Output Format
             {{
@@ -130,7 +131,7 @@ def get_reviewer_prompt() -> dict:
         2. File structure (Are the files named correctly? Is the logic well-separated?)
         3. Code quality and Edge cases.
         4. Rule Compliance (Does the code STRICTLY follow the <project_guidelines>?)
-        
+
         If the project is perfect, set "decision" to "approve".
         If there are any issues, set "decision" to "reject" and provide specific, actionable feedback.
         

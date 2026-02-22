@@ -145,6 +145,10 @@ def main(model_name: str, provider: str):
                     messages.append({"role": "assistant", "content": f"({len(final_files)}個のファイルを生成しました。)"})
                 needs_user_input = True
                 continue
+
+            else:
+                # コマンド以外の通常テキストなら、メッセージリストに追加する
+                messages.append({"role": "user", "content": user_input})
                 
         # --- AI思考フェーズ ---
         # 交換回数チェック
