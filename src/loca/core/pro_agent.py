@@ -65,14 +65,18 @@ def run_pro_mode(task: str, model_name: str = "qwen2.5-coder:32b", provider: str
         for f in final_files:
             filepath = f.get("filepath", "unknown.py")
             console.print(f"\n[bold blue]📄 {filepath}[/bold blue]")
-            syntax = Syntax(f.get("content", ""), "python", theme="monokai", line_numbers=True)
+            # ファイル拡張子からシンタックスハイライトの言語を推定
+            ext = filepath.rsplit(".", 1)[-1] if "." in filepath else "text"
+            lang_map = {"py": "python", "js": "javascript", "ts": "typescript", "html": "html", "css": "css", "json": "json", "md": "markdown", "yml": "yaml", "yaml": "yaml", "sh": "bash", "toml": "toml"}
+            syntax_lang = lang_map.get(ext, ext)
+            syntax = Syntax(f.get("content", ""), syntax_lang, theme="monokai", line_numbers=True)
             console.print(Panel(syntax, border_style="magenta"))
         
         if auto_mode:
             save_ans = 'y'
             console.print("\n[bold yellow]🤖 Auto Mode: 全ファイルを自動生成します...[/bold yellow]")
         else:
-            save_ans = input(f"\nこれら {len(final_files)} 個のファイルを提案されたパスに自動生成しますか？ [y/N]: ").strip().lower()
+            save_ans = console.input(f"\nこれら {len(final_files)} 個のファイルを提案されたパスに自動生成しますか？ [y/N]: ").strip().lower()
             
         if save_ans == 'y':
             for f in final_files:

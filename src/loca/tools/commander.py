@@ -1,33 +1,34 @@
 import subprocess
 import os
 from pathlib import Path
+from loca.ui.display import console
 
 def execute_command(command: str, auto_mode: bool = False) -> str:
     """
     LLMが提案したシェルコマンドを安全に実行し、結果のテキストを返す。
     """
     # ユーザーに分かりやすく提案されたコマンドを表示
-    print(f"\n[AI Proposal]: \033[1;33m{command}\033[0m")
+    console.print(f"\n[bold yellow]\\[AI Proposal]: {command}[/bold yellow]")
     
     # 1. 安全装置: ユーザーに確認を求める (Autoモード対応)
     if auto_mode:
-        print("\033[90m[🤖 Auto Mode] コマンドを自動実行します...\033[0m")
+        console.print("[dim]🤖 [Auto Mode] コマンドを自動実行します...[/dim]")
     else:
         while True:
-            choice = input("Execute? [y/N/e (edit)]: ").strip().lower()
+            choice = console.input("[bold]Execute? [y/N/e (edit)]: [/bold]").strip().lower()
             
             if choice == 'y':
                 break
             elif choice == 'e':
                 # ユーザーがコマンドを手動で修正できるようにする
-                command = input("Edit command: ").strip()
+                command = console.input("[bold]Edit command: [/bold]").strip()
                 if not command:
                     return "キャンセルされました。"
                 break
             elif choice == 'n' or choice == '':
                 return "ユーザーによって実行がキャンセルされました。"
             else:
-                print("y, n, e のいずれかを入力してください。")
+                console.print("[dim]y, n, e のいずれかを入力してください。[/dim]")
 
     # 2. ファイル作成コマンドの特別処理
     # 例: echo "内容" > ファイル名 など

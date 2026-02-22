@@ -18,8 +18,17 @@ def auto_commit(model_name: str = "qwen2.5-coder:32b", provider: str = "ollama")
     if not status:
         console.print("[yellow]変更されたファイルがありません。[/yellow]\n")
         return
-        
-    subprocess.run("git add .", shell=True)
+    
+    # 変更されたファイルを一覧表示して確認を求める
+    console.print(f"\n[bold]📋 変更されたファイル:[/bold]")
+    console.print(f"[dim]{status}[/dim]\n")
+    
+    stage_choice = console.input("[bold]これらのファイルを全てステージングしますか？ [Y/n]: [/bold]").strip().lower()
+    if stage_choice == 'n':
+        console.print("[dim]コミットをキャンセルしました。[/dim]\n")
+        return
+    
+    subprocess.run("git add -A", shell=True)
     
     diff = subprocess.run("git diff --staged", shell=True, capture_output=True, text=True).stdout.strip()
     if not diff:
@@ -37,10 +46,10 @@ def auto_commit(model_name: str = "qwen2.5-coder:32b", provider: str = "ollama")
     commit_msg = res.get("raw_response", "Update files").strip()
     
     console.print(f"\n[bold green]✨ 提案されたメッセージ:[/bold green] {commit_msg}")
-    choice = input("このメッセージでコミットしますか？ [Y/n/e (編集)]: ").strip().lower()
+    choice = console.input("[bold]このメッセージでコミットしますか？ [Y/n/e (編集)]: [/bold]").strip().lower()
     
     if choice == 'e':
-        commit_msg = input("新しいコミットメッセージを入力: ").strip()
+        commit_msg = console.input("[bold]新しいコミットメッセージを入力: [/bold]").strip()
     elif choice == 'n':
         console.print("[dim]コミットをキャンセルしました。(git addは維持されています)[/dim]\n")
         return

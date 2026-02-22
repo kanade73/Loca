@@ -1,14 +1,13 @@
-import os
-from pathlib import Path
 from rich.panel import Panel
 from rich.table import Table
 from loca.ui.display import console
+import loca.config as config
 
 class MemoryManager:
-    """Locaの掟（loca_rules.md）を管理するクラス"""
+    """Locaの掟（Loca.md）を管理するクラス"""
     
     def __init__(self):
-        self.rules_path = Path(os.getcwd()) / "loca_rules.md"
+        self.rules_path = config.get_rules_path()
 
     def remember(self, rule: str):
         try:
@@ -20,7 +19,7 @@ class MemoryManager:
 
     def show_rules(self):
         if not self.rules_path.exists():
-            console.print("[yellow]まだ記憶（loca_rules.md）がありません。[/yellow]")
+            console.print("[yellow]まだ記憶（Loca.md）がありません。[/yellow]")
             return
             
         try:
