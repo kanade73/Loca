@@ -31,8 +31,10 @@ def route_command(
     auto_mode と exchange_count は変更される可能性があるため戻り値に含める。
     """
     result = RouteResult()
-    stripped = user_input.strip()
-    lower = stripped.lower()
+    
+    # 入力のサニタイズ: 先頭の '>' や空白を除去（プロンプト記号の誤入力対策）
+    sanitized = user_input.strip().lstrip('>').strip()
+    lower = sanitized.lower()
     
     # --- 終了 ---
     if lower in ['exit', 'quit']:
@@ -42,7 +44,7 @@ def route_command(
         return result, auto_mode, exchange_count
     
     # --- 空入力 ---
-    if not stripped:
+    if not sanitized:
         result.handled = True
         return result, auto_mode, exchange_count
     
@@ -81,17 +83,17 @@ def route_command(
     # /ask 後にプロンプトが戻らないバグ防止: 毎回通常モードに復元する
     messages[0] = get_system_prompt()
     
-    if user_input.startswith("/ask"):
+    if sanitized.startswith("/ask"):
         result.is_ask_mode = True
-        question = user_input[4:].strip()
+        question = sanitized[4:].strip()
         messages[0] = get_system_prompt(is_ask_mode=True)
         enforced_question = f"{question}\n\n(※必ずシステムプロンプト内の <project_guidelines> に指定された掟やトーンを厳格に守って回答してください)"
         messages.append({"role": "user", "content": enforced_question})
         return result, auto_mode, exchange_count
     
     # --- /remember ---
-    if user_input.startswith("/remember "):
-        rule = user_input[len("/remember "):].strip()
+    if sanitized.startswith("/remember "):
+        rule = sanitized[len("/remember "):].strip()
         if rule:
             memory.remember(rule)
             messages[0] = get_system_prompt()
@@ -99,14 +101,14 @@ def route_command(
         return result, auto_mode, exchange_count
     
     # --- /rules ---
-    if stripped == "/rules":
+    if lower == "/rules":
         memory.show_rules()
         result.handled = True
         return result, auto_mode, exchange_count
     
     # --- /forget ---
-    if user_input.startswith("/forget "):
-        target = user_input[len("/forget "):].strip()
+    if sanitized.startswith("/forget "):
+        target = sanitized[len("/forget "):].strip()
         if target:
             memory.forget(target)
             messages[0] = get_system_prompt()
@@ -114,14 +116,14 @@ def route_command(
         return result, auto_mode, exchange_count
     
     # --- /commit ---
-    if user_input.startswith("/commit"):
+    if sanitized.startswith("/commit"):
         auto_commit(model_name=model_name, provider=provider)
         result.handled = True
         return result, auto_mode, exchange_count
     
     # --- /pro ---
-    if user_input.startswith("/pro"):
-        task = user_input[4:].strip()
+    if sanitized.startswith("/pro"):
+        task = sanitized[4:].strip()
         if not task:
             console.print("[dim]タスクの内容を入力してください。(例: /pro テトリスを作って)[/dim]")
         else:
@@ -133,5 +135,6 @@ def route_command(
         return result, auto_mode, exchange_count
     
     # --- 通常テキスト（コマンドでない） ---
-    messages.append({"role": "user", "content": user_input})
+    messages.append({"role": "user", "content": sanitized})
     return result, auto_mode, exchange_count
+
