@@ -11,7 +11,6 @@ dependencies = [
     "ollama",            # ローカルLLM用（LiteLLMの裏側で呼ばれることがあります）
     "rich",              # ターミナルの美しいUI表示用
     "prompt-toolkit>=3.0.52",
-    "typer",
     "ddgs>=9.10.0",
 ]
 

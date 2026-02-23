@@ -77,7 +77,7 @@ def read_directory(dir_path: str = ".", max_depth: int = 2) -> str:
     AIがプロジェクトの全体像を把握するために使用する。
     """
     # 読み込まなくていいフォルダを追加（build や egg-info など）
-    ignore_dirs = {'.git', '__pycache__', 'venv', '.venv', 'node_modules', '.pytest_cache', 'build', 'my_agent_cli.egg-info'}
+    ignore_dirs = {'.git', '__pycache__', 'venv', '.venv', 'node_modules', '.pytest_cache', 'build'}
     
     try:
         base_path = Path(dir_path)
@@ -96,7 +96,7 @@ def read_directory(dir_path: str = ".", max_depth: int = 2) -> str:
                 dirs[:] = [] 
                 
             # 無視するディレクトリや隠しフォルダ(.vscode等)を除外
-            dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith('.')]
+            dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith('.') and not d.endswith('.egg-info')]
             
             if root == str(base_path):
                 indent = ""

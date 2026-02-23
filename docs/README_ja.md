@@ -30,88 +30,7 @@ ollama pull qwen2.5-coder:7b
 ```
 
 ### 2. Locaのセットアップ
-                                                                                                            │
-│                    Systems Online. Connected to local brain: qwen2.5-coder:32b (OLLAMA)                    │
-│                                                                                                            │
-╰─────────────────────────────────────────── Type 'exit' to quit ────────────────────────────────────────────╯
 
-
-
-💡 [Enter] 送信 / [Alt+Enter] または [Esc]→[Enter] で改行
-> みかんって30回出力するpythonコードを書いてください。
-📊 Tokens: ~2281 | Exchange: 1/30
-⏱️ Thought completed in 29.1s
-╭──────────────────────────────────────────────── AI Thought ────────────────────────────────────────────────╮
-│ To understand the project layout and identify which files might need editing or updating, I will first     │
-│ read the directory structure.                                                                              │
-╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-📂 Reading directory: .
-ディレクトリ構造を読み込みました。
-
-Action Result:
-Directory structure of '/Users/kanade/dev/Loca' (max_depth=2):
-├── uv.lock
-├── Loca.md
-├── pyproject.toml
-├── README.md
-  ├── [DIR] docs/
-    ├── README_ja.md
-  ├── [DIR] src/
-    ├── [DIR] Loca.egg-info/
-      ├── PKG-INFO
-      ├── SOURCES.txt
-      ├── entry_points.txt
-      ├── requires.txt
-      ├── top_level.txt
-      ├── dependency_links.txt
-    ├── [DIR] loca/
-      ├── config.py
-      ├── __init__.py
-      ├── main.py
-
-📊 Tokens: ~2844 | Exchange: 2/30
-⏱️ Thought completed in 17.3s
-╭──────────────────────────────────────────────── AI Thought ────────────────────────────────────────────────╮
-│ The project structure is now clear. To proceed, I need to understand the current state of the code or any  │
-│ specific requirements for modification. Since no specific task was mentioned, I will start by reading one  │
-│ of the key files, such as 'pyproject.toml', to understand the project dependencies and configuration.      │
-╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-📄 Reading file: pyproject.toml
-内容をメモリに読み込みました。
-
-Action Result:
---- pyproject.toml の中身 ---
-
-package = true
-
-name = "Loca"
-version = "0.1.0"
-description = "Autonomous CLI agent app (Loca) using LiteLLM and Rich"
-readme = "README.md"
-requires-python = ">=3.12"
-dependencies = [
-    "litellm>=1.81.13",  # OpenAI/Anthropic等のAPI抽象化
-    "ollama",            # ローカルLLM用（LiteLLMの裏側で呼ばれることがあります）
-    "rich",              # ターミナルの美しいUI表示用
-    "prompt-toolkit>=3.0.52",
-    "typer",
-    "ddgs>=9.10.0",
-]
-
-
-# ★ ここが超重要！
-# 先ほど main.py の最後に作った `cli` 関数を、グローバルコマンドとして登録します。
-# これでターミナルで `loca` と打つだけで起動するようになります！
-loca = "loca.main:cli"
-
---- EOF ---
-
-📊 Tokens: ~3589 | Exchange: 3/30
-⏱️ Thought completed in 12.2s
-✏️ Editing file: pyproject.toml
-old_text: version = "0.1.0"
-new_text: version = "0.2.0"
-編集を許可しますか？ : 
 ```bash
 git clone https://github.com/kanade73/Loca.git
 cd Loca
@@ -167,6 +86,7 @@ loca -p openai -m gpt-4o
 | `/remember <ルール>` | Locaにルールやあなたの好みを記憶させます |
 | `/rules` | 現在記憶しているルールを一覧表示します |
 | `/forget <番号>` | 特定のルールを削除します |
+| `/undo` | Locaが行った直前のファイル変更を元に戻します |
 
 ---
 
@@ -229,17 +149,20 @@ Locaは以下のツールを自律的に選択し、タスクを遂行します�
 Loca/
 ├── src/loca/
 │   ├── config.py      # デフォルトモデル・プロバイダー、パス管理
-│   ├── main.py        # エントリーポイント、コマンドルーティング、メッセージ管理
+│   ├── main.py        # エントリーポイント、メインループ、メッセージ管理
 │   ├── core/
 │   │   ├── llm_client.py   # LiteLLM経由のLLM通信・JSONパース
 │   │   ├── prompts.py      # システムプロンプト・ツール定義
 │   │   ├── memory.py       # Loca.mdの読み書き（記憶システム）
-│   │   └── pro_agent.py    # /pro モードのEditor/Reviewerロジック
+│   │   ├── pro_agent.py    # /pro モードのEditor/Reviewerロジック
+│   │   ├── router.py       # コマンドルーティング（/ask, /pro, /undo 等）
+│   │   └── executor.py     # アクション実行・ユーザー確認フロー
 │   ├── tools/
 │   │   ├── commander.py    # シェルコマンドの安全な実行
 │   │   ├── file_ops.py     # ファイル読み書き・パス安全検証
 │   │   ├── git_ops.py      # Gitコミット・差分解析
-│   │   └── web_search.py   # DuckDuckGo検索
+│   │   ├── web_search.py   # DuckDuckGo検索
+│   │   └── backup.py       # ファイルバックアップ・取り消しシステム
 │   └── ui/
 │       ├── display.py      # Rich UIコンポーネント・入力処理
 │       └── header.py       # 起動時ヘッダー表示

@@ -824,7 +824,6 @@ dependencies = [
     { name = "ollama" },
     { name = "prompt-toolkit" },
     { name = "rich" },
-    { name = "typer" },
 ]
 
 [package.metadata]
@@ -834,7 +833,6 @@ requires-dist = [
     { name = "ollama" },
     { name = "prompt-toolkit", specifier = ">=3.0.52" },
     { name = "rich" },
-    { name = "typer" },
 ]
 
 [[package]]

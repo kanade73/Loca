@@ -4,9 +4,9 @@ from loca.core.llm_client import chat_with_llm
 import loca.config as config
 
 def auto_commit(model_name: str = None, provider: str = None):
+    """Gitの変更を解析し、自動でコミットメッセージを生成してコミットする"""
     model_name = model_name or config.DEFAULT_MODEL
     provider = provider or config.DEFAULT_PROVIDER
-    """Gitの変更を解析し、自動でコミットメッセージを生成してコミットする"""
     console.print(f"\n[bold cyan]🐙 Git Auto Commit を開始します...[/bold cyan]")
     
     status_res = subprocess.run("git status --porcelain", shell=True, capture_output=True, text=True)

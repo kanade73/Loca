@@ -105,6 +105,12 @@ def estimate_tokens(messages: list) -> int:
     メッセージリストの概算トークン数を返す。
     日本語は1文字≈1.5トークン、英語は4文字≈1トークンの簡易推定。
     """
-    total_chars = sum(len(m.get("content", "")) for m in messages)
-    # 日英混在を想定し、1文字≈1トークンで概算（ざっくり）
-    return total_chars
+    import re
+    total_tokens = 0
+    for m in messages:
+        content = m.get("content", "")
+        # 日本語文字（ひらがな、カタカナ、漢字）をカウント
+        ja_chars = len(re.findall(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', content))
+        en_chars = len(content) - ja_chars
+        total_tokens += int(ja_chars * 1.5) + int(en_chars / 4)
+    return total_tokens

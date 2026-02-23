@@ -69,12 +69,18 @@ def get_system_prompt(is_ask_mode: bool = False) -> dict:
             # Strict Rules
             1. NO conversational text outside the JSON block.
             2. You MUST output ONLY a valid JSON object.
-            3. For 'run_command', DO NOT chain commands using `&&` or `;`. Execute ONE command at a time.
+            3. For 'run_command', DO NOT chain commands using `&&` or `;`. Execute ONE command at a time. This means multi-step setups (e.g., makemigrations then migrate) require multiple sequential actions.
             4. NEVER use single quotes (') to enclose JSON string values. You MUST use double quotes (") and escape inner double quotes (e.g., "content": "print(\\"Hello\\")").
             5. When installing Python packages, ALWAYS use `uv pip install` instead of standard `pip`.
             6. For multi-line text in JSON (like file content), use explicit `\\n` characters for newlines. DO NOT use actual physical line breaks inside the JSON string.
             7. If you are unsure about the current content of a file, ALWAYS use `read_file` to check before editing or overwriting it. Do not rely on memory from earlier in the conversation.
             8. DO NOT use `read_directory` unless asked. If the user asks for code without a filename, IMMEDIATELY invent a relevant filename (e.g., 'mikan_loop.py') and use `write_file` to implement the EXACT logic requested by the user. NEVER use generic placeholders like "Hello World" when specific instructions are given.
+            9. FRAMEWORK POST-SETUP: When creating a project that uses a framework, you MUST complete ALL setup steps required to make it runnable. Examples:
+               - Django: After writing models, run `python manage.py makemigrations` then `python manage.py migrate`.
+               - Node.js: After creating package.json, run `npm install`.
+               - Flask/FastAPI: Ensure database init scripts are executed if using an ORM.
+               Do NOT consider the task complete until the project can actually run without errors.
+            10. VERIFICATION BEFORE COMPLETION: Before using action "none" to finish a task, you SHOULD verify the result works by running the application or relevant command (e.g., start the dev server for web apps, run `python main.py` for scripts). If errors occur, fix them before finishing.
             
             # Output Format
             {{
@@ -131,6 +137,7 @@ def get_reviewer_prompt() -> dict:
         2. File structure (Are the files named correctly? Is the logic well-separated?)
         3. Code quality and Edge cases.
         4. Rule Compliance (Does the code STRICTLY follow the <project_guidelines>?)
+        5. Runnability (Can the project actually start and run? Are all required setup steps like database migrations, dependency installs, and build commands accounted for in the implementation plan?)
 
         If the project is perfect, set "decision" to "approve".
         If there are any issues, set "decision" to "reject" and provide specific, actionable feedback.

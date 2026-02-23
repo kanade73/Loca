@@ -1,23 +1,19 @@
 import time
 import argparse
-from rich.panel import Panel
-
 
 # --- コア機能 ---
 from loca.core.llm_client import chat_with_llm, stream_chat_with_llm, extract_json_from_text, estimate_tokens
 from loca.core.prompts import get_system_prompt
 from loca.core.memory import MemoryManager
-from loca.core.pro_agent import run_pro_mode
+from loca.core.router import route_command
+from loca.core.executor import execute_action
 
 # --- ツール ---
 from loca.tools.web_search import search_web
-from loca.tools.commander import execute_command
-from loca.tools.file_ops import read_file, write_file, edit_file, read_directory
-from loca.tools.git_ops import auto_commit
 
 # --- UI ---
 from loca.ui.header import print_header
-from loca.ui.display import console, print_thought, print_command, print_error, get_user_input
+from loca.ui.display import console, print_thought, print_error, get_user_input
 from rich.live import Live
 from rich.markdown import Markdown
 
@@ -69,86 +65,21 @@ def main(model_name: str, provider: str):
             except (KeyboardInterrupt, EOFError):
                 console.print("\n[dim]Shutting down agent...[/dim]")
                 break
-                
-            if user_input.lower() in ['exit', 'quit']:
-                console.print("[dim]Shutting down agent...[/dim]")
-                break
-                
-            if not user_input:
-                continue
 
-            # コマンドのルーティング
-            if user_input.lower().strip() == "/auto":
-                auto_mode = not auto_mode
-                status = "ON (全自動・承認スキップ)" if auto_mode else "OFF (都度確認)"
-                console.print(f"\n[bold yellow]🤖 Auto Mode: {status}[/bold yellow]\n")
-                needs_user_input = True
-                continue
-
-            if user_input.lower().strip() == "/clear":
-                sys_prompt = get_system_prompt()
-                messages = [sys_prompt]
-                exchange_count = 0
-                console.print("\n[bold cyan]🔄 会話をリセットしました。新しいタスクを入力してください。[/bold cyan]\n")
-                needs_user_input = True
-                continue
-
-            is_ask_mode = False
-            # /ask 後にプロンプトが戻らないバグ防止: 毎回通常モードに復元する
-            messages[0] = get_system_prompt()
+            # コマンドルーティング
+            route_result, auto_mode, exchange_count = route_command(
+                user_input, messages, memory,
+                model_name=model_name, provider=provider,
+                auto_mode=auto_mode, exchange_count=exchange_count,
+            )
             
-            if user_input.startswith("/ask"):
-                is_ask_mode = True
-                question = user_input[4:].strip()
-                messages[0] = get_system_prompt(is_ask_mode=True)
-                enforced_question = f"{question}\n\n(※必ずシステムプロンプト内の <project_guidelines> に指定された掟やトーンを厳格に守って回答してください)"
-                messages.append({"role": "user", "content": enforced_question})
-
-            elif user_input.startswith("/remember "):
-                rule = user_input[len("/remember "):].strip()
-                if rule:
-                    memory.remember(rule)
-                    sys_prompt = get_system_prompt()
-                    messages[0] = sys_prompt
+            if route_result.should_exit:
+                break
+            if route_result.handled:
                 needs_user_input = True
                 continue
-                
-            elif user_input.strip() == "/rules":
-                memory.show_rules()
-                needs_user_input = True
-                continue
-                
-            elif user_input.startswith("/forget "):
-                target = user_input[len("/forget "):].strip()
-                if target:
-                    memory.forget(target)
-                    sys_prompt = get_system_prompt()
-                    messages[0] = sys_prompt
-                needs_user_input = True
-                continue
-
-            elif user_input.startswith("/commit"):
-                auto_commit(model_name=model_name, provider=provider)
-                needs_user_input = True
-                continue
-                
-            elif user_input.startswith("/pro"):
-                task = user_input[4:].strip()
-                if not task:
-                    console.print("[dim]タスクの内容を入力してください。(例: /pro テトリスを作って)[/dim]")
-                    needs_user_input = True
-                    continue
-                
-                final_files = run_pro_mode(task, model_name=model_name, provider=provider, auto_mode=auto_mode)
-                if final_files:
-                    messages.append({"role": "user", "content": f"(Proモード実行: {task})"})
-                    messages.append({"role": "assistant", "content": f"({len(final_files)}個のファイルを生成しました。)"})
-                needs_user_input = True
-                continue
-
-            else:
-                # コマンド以外の通常テキストなら、メッセージリストに追加する
-                messages.append({"role": "user", "content": user_input})
+            
+            is_ask_mode = route_result.is_ask_mode
                 
         # --- AI思考フェーズ ---
         # 交換回数チェック
@@ -156,8 +87,8 @@ def main(model_name: str, provider: str):
         if exchange_count > MAX_EXCHANGES:
             console.print(f"\n[bold yellow]⚠️ セッションの上限 ({MAX_EXCHANGES}回) に達しました。コンテキストをリセットします。[/bold yellow]")
             console.print("[dim]新しいタスクを入力してください。[/dim]\n")
-            sys_prompt = get_system_prompt()
-            messages = [sys_prompt]
+            messages.clear()
+            messages.append(get_system_prompt())
             exchange_count = 0
             needs_user_input = True
             continue
@@ -171,7 +102,6 @@ def main(model_name: str, provider: str):
         # /ask モード: ストリーミング表示
         if is_ask_mode:
             raw_text = ""
-            parsed_json = None
             
             # まず通常のレスポンスを取得（web_searchアクションの判定のため）
             with console.status("[bold cyan]AI is thinking...", spinner="dots"):
@@ -237,110 +167,13 @@ def main(model_name: str, provider: str):
         console.print(f"[dim]⏱️ Thought completed in {elapsed_time:.1f}s[/dim]")
         print_thought(thought)
 
-        result_output = ""
-        
         # --- アクション実行フェーズ ---
-        if action == "run_command":
-            cmd = args.get("command", "")
-            if not cmd:
-                result_output = "Error: command引数が指定されていません。"
-            else:
-                print_command(cmd)
-                result_output = execute_command(cmd, auto_mode=auto_mode)
-            
-        elif action == "read_file":
-            filepath = args.get("filepath", "")
-            console.print(f"[bold blue]📄 Reading file:[/bold blue] {filepath}")
-            result_output = read_file(filepath)
-            console.print(f"[dim]内容をメモリに読み込みました。[/dim]")
-
-        elif action == "write_file":
-            filepath = args.get("filepath", "")
-            content = args.get("content", "")
-            console.print(f"[bold green]📝 Writing file:[/bold green] {filepath}")
-            print_command(content)
-            
-            if auto_mode:
-                confirm = 'y'
-                console.print("[dim]🤖 Auto Mode: 自動で書き込みを許可しました。[/dim]")
-            else:
-                console.print("[dim]💡 ヒント: 'n 理由' でAIに指示を出せます。'q' でタスクを強制終了できます。[/dim]")
-                confirm = input("編集を許可しますか？ [y/N/q]: ").strip()
-                
-            if confirm.lower() == 'y' or confirm == '':
-                result_output = write_file(filepath, content)
-                console.print(f"[dim]ファイルに書き込みました。[/dim]")
-                
-            elif confirm.lower() == 'q':
-                # 【Kill機能】タスク自体を強制終了してユーザー入力に戻る
-                console.print("[bold red]🛑 タスクを強制終了(Kill)しました。[/bold red]")
-                messages.append({"role": "user", "content": "ユーザーがこの処理を強制終了しました。絶対にこれ以上何もせず、すぐに Action: none を返して待機状態に戻ってください。"})
-                needs_user_input = True
-                continue
-                
-            else:
-                # 【フィードバック機能】'n'の後に理由を書けるようにする (例: "n その変数は消さないで")
-                reason = confirm[1:].strip() if confirm.lower().startswith('n') and len(confirm) > 1 else ""
-                
-                if reason:
-                    result_output = f"ユーザーに拒否されました。理由: {reason} （※指示に従い、同じ変更は絶対に繰り返さないでください）"
-                else:
-                    result_output = "ユーザーに拒否されました。（※同じアクションを繰り返すのは禁止です。別のアプローチを提案するか、人間に質問してください）"
-                    
-                console.print(f"[dim]書き込みをキャンセルし、AIに強い拒否のフィードバックを送りました。[/dim]")
-
-        elif action == "edit_file":
-            filepath = args.get("filepath", "")
-            old_text = args.get("old_text", "")
-            new_text = args.get("new_text", "")
-            console.print(f"[bold yellow]✏️ Editing file:[/bold yellow] {filepath}")
-            console.print(f"[dim]old_text: {old_text[:100]}{'...' if len(old_text) > 100 else ''}[/dim]")
-            console.print(f"[dim]new_text: {new_text[:100]}{'...' if len(new_text) > 100 else ''}[/dim]")
-            
-            if auto_mode:
-                confirm = 'y'
-                console.print("[dim]🤖 Auto Mode: 自動で編集を許可しました。[/dim]")
-            else:
-                # ★ ここからキルスイッチとフィードバック対応にアップグレード！
-                console.print("[dim]💡 ヒント: 'n 理由' でAIに指示を出せます。'q' でタスクを強制終了できます。[/dim]")
-                confirm = console.input("[bold]編集を許可しますか？ [y/N/q]: [/bold]").strip()
-            
-            if confirm.lower() == 'y' or confirm == '':
-                result_output = edit_file(filepath, old_text, new_text)
-                console.print(f"[dim]ファイルを編集しました。[/dim]")
-                
-            elif confirm.lower() == 'q':
-                # 【Kill機能】
-                console.print("[bold red]🛑 タスクを強制終了(Kill)しました。[/bold red]")
-                messages.append({"role": "user", "content": "ユーザーがこの処理を強制終了しました。絶対にこれ以上何もせず、すぐに Action: none を返して待機状態に戻ってください。"})
-                needs_user_input = True
-                continue
-                
-            else:
-                # 【フィードバック機能】
-                reason = confirm[1:].strip() if confirm.lower().startswith('n') and len(confirm) > 1 else ""
-                if reason:
-                    result_output = f"ユーザーに拒否されました。理由: {reason} （※指示に従い、同じ変更は絶対に繰り返さないでください）"
-                else:
-                    result_output = "ユーザーに拒否されました。（※同じアクションを繰り返すのは禁止です。別のアプローチを提案するか、人間に質問してください）"
-                console.print(f"[dim]編集をキャンセルし、AIに強い拒否のフィードバックを送りました。[/dim]")
-
-        elif action == "read_directory":
-            dir_path = args.get("dir_path", ".")
-            console.print(f"[bold blue]📂 Reading directory:[/bold blue] {dir_path}")
-            result_output = read_directory(dir_path)
-            console.print(f"[dim]ディレクトリ構造を読み込みました。[/dim]")
-
-        elif action == "web_search":
-            query = args.get("query", "")
-            console.print(f"[bold cyan]🔍 Web Searching:[/bold cyan] {query}")
-            result_output = search_web(query)
-            console.print("[dim]検索結果を取得しました。[/dim]")
+        result_output, should_kill = execute_action(action, args, auto_mode)
         
-        elif action == "none":
-            pass
-        else:
-            result_output = f"Error: 未知のアクション '{action}'"
+        if should_kill:
+            messages.append({"role": "user", "content": "ユーザーがこの処理を強制終了しました。絶対にこれ以上何もせず、すぐに Action: none を返して待機状態に戻ってください。"})
+            needs_user_input = True
+            continue
 
         if action != "none":
             messages.append({"role": "assistant", "content": f"```json\n{{\"action\": \"{action}\", \"args\": {args}}}\n```"})

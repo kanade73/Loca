@@ -88,6 +88,7 @@ loca -p openai -m gpt-4o
 | `/remember <rule>` | Teaches Loca a rule or preference |
 | `/rules` | Lists all remembered rules |
 | `/forget <number>` | Removes a specific rule |
+| `/undo` | Reverts the last file change made by Loca |
 
 ---
 
@@ -150,17 +151,20 @@ Add rules and preferences to `Loca.md` and Loca will follow them in every task:
 Loca/
 ├── src/loca/
 │   ├── config.py      # Default model/provider, path management
-│   ├── main.py        # Entry point, command routing, message management
+│   ├── main.py        # Entry point, main loop, message management
 │   ├── core/
 │   │   ├── llm_client.py   # LLM communication via LiteLLM
 │   │   ├── prompts.py      # System prompts & tool definitions
 │   │   ├── memory.py       # Loca.md read/write (memory system)
-│   │   └── pro_agent.py    # /pro mode Editor/Reviewer logic
+│   │   ├── pro_agent.py    # /pro mode Editor/Reviewer logic
+│   │   ├── router.py       # Command routing (/ask, /pro, /undo, etc.)
+│   │   └── executor.py     # Action execution & user confirmation
 │   ├── tools/
 │   │   ├── commander.py    # Safe shell command execution
 │   │   ├── file_ops.py     # File I/O with path validation
 │   │   ├── git_ops.py      # Git commit & diff analysis
-│   │   └── web_search.py   # DuckDuckGo search
+│   │   ├── web_search.py   # DuckDuckGo search
+│   │   └── backup.py       # File backup & undo system
 │   └── ui/
 │       ├── display.py      # Rich UI components
 │       └── header.py       # Startup header
