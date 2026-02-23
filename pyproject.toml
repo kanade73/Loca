@@ -15,7 +15,4 @@ dependencies = [
 ]
 
 [project.scripts]
-# ★ ここが超重要！
-# 先ほど main.py の最後に作った `cli` 関数を、グローバルコマンドとして登録します。
-# これでターミナルで `loca` と打つだけで起動するようになります！
 loca = "loca.main:cli"
