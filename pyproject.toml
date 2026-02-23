@@ -7,11 +7,11 @@ description = "Autonomous CLI agent app (Loca) using LiteLLM and Rich"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "litellm>=1.81.13",  # OpenAI/Anthropic等のAPI抽象化
-    "ollama",            # ローカルLLM用（LiteLLMの裏側で呼ばれることがあります）
-    "rich",              # ターミナルの美しいUI表示用
+    "litellm>=1.81.13",
+    "ollama",
+    "rich",
     "prompt-toolkit>=3.0.52",
-    "ddgs>=9.10.0",
+    "ddgs>=9.10.0"
 ]
 
 [project.scripts]
