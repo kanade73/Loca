@@ -3,6 +3,7 @@ from loca.tools.commander import execute_command
 from loca.tools.file_ops import read_file, write_file, edit_file, read_directory
 from loca.tools.web_search import search_web
 from loca.tools.backup import BackupManager
+import subprocess
 
 # グローバルなバックアップマネージャー（/undo で使用）
 backup_manager = BackupManager()
@@ -16,6 +17,47 @@ def confirm_action(auto_mode: bool) -> str:
     
     console.print("[dim]💡 ヒント: 'n 理由' でAIに指示を出せます。'q' でタスクを強制終了できます。[/dim]")
     return console.input("[bold]編集を許可しますか？ [y/N/q]: [/bold]").strip()
+
+
+def lint_python_file(filepath: str) -> str:
+    """Pythonファイルに対してruffを実行し、エラーがあればメッセージを返す。"""
+    if not filepath.endswith('.py'):
+        return ""
+    errors = []
+    # 1. ruff 静的チェック
+    try:
+        result = subprocess.run(
+            ["ruff", "check", filepath, "--output-format=concise"],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode != 0 and result.stdout.strip():
+            lint_errors = result.stdout.strip()
+            console.print(f"[bold yellow]⚠️ Lint警告が検出されました:[/bold yellow]")
+            console.print(f"[dim]{lint_errors}[/dim]")
+            errors.append(f"⚠️ Lint Errors (ruff):\n{lint_errors}")
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+    
+    # 2. Python 構文・import チェック
+    try:
+        result = subprocess.run(
+            ["python", "-c", f"import py_compile; py_compile.compile('{filepath}', doraise=True)"],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode != 0:
+            err_msg = result.stderr.strip().split('\n')[-1] if result.stderr.strip() else "Syntax error"
+            console.print(f"[bold red]❌ 構文エラーが検出されました:[/bold red]")
+            console.print(f"[dim]{err_msg}[/dim]")
+            errors.append(f"❌ Syntax Error:\n{err_msg}")
+    except Exception:
+        pass
+    
+    if errors:
+        combined = "\n\n".join(errors)
+        return f"\n\n{combined}\nこれらのエラーを修正してください。特にimportの漏れや存在しないAPIの使用に注意してください。"
+    return ""
 
 
 def handle_rejection(confirm: str) -> str:
@@ -62,6 +104,8 @@ def execute_action(action: str, args: dict, auto_mode: bool) -> tuple[str, bool]
         if confirm.lower() == 'y':
             backup_manager.save(filepath)
             result_output = write_file(filepath, content)
+            lint_msg = lint_python_file(filepath)
+            result_output += lint_msg
             console.print("[dim]ファイルに書き込みました。[/dim]")
         elif confirm.lower() == 'q':
             console.print("[bold red]🛑 タスクを強制終了(Kill)しました。[/bold red]")
@@ -83,6 +127,8 @@ def execute_action(action: str, args: dict, auto_mode: bool) -> tuple[str, bool]
         if confirm.lower() == 'y':
             backup_manager.save(filepath)
             result_output = edit_file(filepath, old_text, new_text)
+            lint_msg = lint_python_file(filepath)
+            result_output += lint_msg
             console.print("[dim]ファイルを編集しました。[/dim]")
         elif confirm.lower() == 'q':
             console.print("[bold red]🛑 タスクを強制終了(Kill)しました。[/bold red]")
