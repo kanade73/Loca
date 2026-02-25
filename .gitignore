@@ -29,3 +29,5 @@ Thumbs.db
 htmlcov/
 .ruff_cache/
 .mypy_cache/
+
+.claude
