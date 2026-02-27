@@ -5,27 +5,28 @@ import litellm
 
 litellm.suppress_debug_info = True
 
+
 def extract_json_from_text(text: str) -> dict | None:
     """AIが複数JSONを出力しても、最初の1つだけを確実に取り出す真のパーサー"""
     matches = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-    
+
     if matches:
         json_str = matches[0]
     else:
         start_idx = text.find('{')
         if start_idx == -1:
             return None
-            
+
         text_to_parse = text[start_idx:]
         try:
             decoder = json.JSONDecoder(strict=False)
             obj, _ = decoder.raw_decode(text_to_parse)
-            return obj 
+            return obj
         except json.JSONDecodeError:
             end_idx = text.rfind('}')
             if end_idx == -1:
                 return None
-            json_str = text[start_idx:end_idx+1]
+            json_str = text[start_idx:end_idx + 1]
 
     try:
         return json.loads(json_str, strict=False)
@@ -38,29 +39,25 @@ def extract_json_from_text(text: str) -> dict | None:
 
 def chat_with_llm(messages: list, model_name: str, provider: str = "ollama", is_ask_mode: bool = False) -> dict:
     """
-    LiteLLMを使用して、あらゆるプロバイダー（Ollama, OpenAI, Anthropic等）と統一フォーマットで通信するFacade関数。
+    LiteLLMを使用して、あらゆるプロバイダーと統一フォーマットで通信するFacade関数。
+    JSON テキストパース方式（フォールバック用）。
     """
     try:
-        # LiteLLMのお作法: Ollama等ローカルの場合は "ollama/モデル名" のように指定する
-        # OpenAIの場合はそのまま "gpt-4o" 等で動くが、統一のために openai/gpt-4o の形にしてもOK
         litellm_model = f"{provider}/{model_name}" if provider != "openai" else model_name
 
         response = litellm.completion(
             model=litellm_model,
             messages=messages,
-            temperature=0.1 
+            temperature=0.1
         )
-        
-        # どのプロバイダーを使っても、OpenAIと同じ形で結果が返ってくる
+
         raw_content = response.choices[0].message.content
-        
-        # 会話モードならパースせずにそのまま返す
+
         if is_ask_mode:
             return {"raw_response": raw_content}
 
-        # JSONを抽出
         parsed_data = extract_json_from_text(raw_content)
-        
+
         if parsed_data:
             return parsed_data
         else:
@@ -68,11 +65,69 @@ def chat_with_llm(messages: list, model_name: str, provider: str = "ollama", is_
                 "error": "JSON_PARSE_ERROR",
                 "raw_response": raw_content
             }
-            
+
     except Exception as e:
         return {
             "error": "LLM_CONNECTION_ERROR",
             "raw_response": f"LLMとの通信に失敗しました。\nモデル: {provider}/{model_name}\n詳細: {str(e)}"
+        }
+
+
+def chat_with_tools(
+    messages: list,
+    tools: list[dict],
+    model_name: str,
+    provider: str = "ollama",
+) -> dict:
+    """
+    Function Calling API を使用してLLMと通信する。JSONパースエラーを根絶する。
+
+    戻り値:
+        成功時: {"thought": str, "action": str, "args": dict}
+        エラー時: {"error": str, "raw_response": str}
+
+    "NO_TOOL_CALL" エラーは Function Calling 非対応モデルのフォールバックサイン。
+    """
+    try:
+        litellm_model = f"{provider}/{model_name}" if provider != "openai" else model_name
+
+        response = litellm.completion(
+            model=litellm_model,
+            messages=messages,
+            tools=tools,
+            tool_choice="required",
+            temperature=0.1,
+        )
+
+        message = response.choices[0].message
+        # テキスト部分は thought として使う（tool_calls と共存する場合も）
+        thought = message.content or ""
+
+        if not message.tool_calls:
+            return {"error": "NO_TOOL_CALL", "raw_response": thought}
+
+        tool_call = message.tool_calls[0]
+        action = tool_call.function.name
+
+        try:
+            args = json.loads(tool_call.function.arguments)
+        except json.JSONDecodeError:
+            args = {}
+
+        # スキーマ定義した thought をargsから取り出す
+        if "thought" in args:
+            thought = args.pop("thought")
+
+        return {"thought": thought, "action": action, "args": args}
+
+    except Exception as e:
+        error_str = str(e)
+        # Function Calling 非対応エラーを検出してフォールバックを促す
+        if any(kw in error_str.lower() for kw in ("tool", "function", "unsupported", "not support")):
+            return {"error": "NO_TOOL_CALL", "raw_response": error_str}
+        return {
+            "error": "LLM_CONNECTION_ERROR",
+            "raw_response": f"LLMとの通信に失敗しました。\nモデル: {provider}/{model_name}\n詳細: {error_str}"
         }
 
 
@@ -83,19 +138,19 @@ def stream_chat_with_llm(messages: list, model_name: str, provider: str = "ollam
     """
     try:
         litellm_model = f"{provider}/{model_name}" if provider != "openai" else model_name
-        
+
         response = litellm.completion(
             model=litellm_model,
             messages=messages,
             temperature=0.1,
             stream=True
         )
-        
+
         for chunk in response:
             content = chunk.choices[0].delta.content
             if content:
                 yield content
-                
+
     except Exception as e:
         yield f"\n\nストリーミング中にエラーが発生しました: {e}"
 
@@ -105,11 +160,9 @@ def estimate_tokens(messages: list) -> int:
     メッセージリストの概算トークン数を返す。
     日本語は1文字≈1.5トークン、英語は4文字≈1トークンの簡易推定。
     """
-    import re
     total_tokens = 0
     for m in messages:
-        content = m.get("content", "")
-        # 日本語文字（ひらがな、カタカナ、漢字）をカウント
+        content = m.get("content", "") or ""
         ja_chars = len(re.findall(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', content))
         en_chars = len(content) - ja_chars
         total_tokens += int(ja_chars * 1.5) + int(en_chars / 4)

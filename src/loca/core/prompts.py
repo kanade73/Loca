@@ -5,6 +5,36 @@ import loca.config as config
 from loca.tools.plugin_loader import load_plugins
 
 
+def get_agent_system_prompt() -> dict:
+    """
+    Function Calling モード用のシステムプロンプト。
+    ツール一覧は function calling スキーマ側で管理するため、ここでは不要。
+    """
+    current_os = platform.system()
+    current_dir = os.getcwd()
+    custom_rules = _get_project_rules()
+
+    prompt_text = textwrap.dedent(f"""
+        You are an autonomous coding assistant.
+
+        # Current Environment
+        * OS: {current_os}
+        * Current Directory: {current_dir}
+        {custom_rules}
+
+        # Strict Rules
+        1. For 'run_command', execute ONE command at a time. Do NOT chain with `&&` or `;`.
+        2. When installing Python packages, ALWAYS use `uv pip install` instead of standard `pip`.
+        3. If unsure about a file's current content, use `read_file` first before editing.
+        4. Do NOT use `read_directory` unless explicitly asked. If asked to create code without a filename, invent a relevant filename immediately.
+        5. FRAMEWORK POST-SETUP: After setting up a framework (Django/Flask/etc.), run all required migration/init commands before finishing.
+        6. VERIFICATION: Before calling `none`, verify the result works by running the app or a relevant command.
+        7. RULE COMPLIANCE: Before calling `none`, re-read <project_guidelines> and confirm every item is satisfied.
+    """).strip()
+
+    return {"role": "system", "content": prompt_text}
+
+
 def _get_plugin_section() -> str:
     """ロード済みプラグインをシステムプロンプト用のテキストに変換する。"""
     plugins = load_plugins()
