@@ -96,7 +96,7 @@ loca -p openai -m gpt-4o
 
 ### 🛠️ 7つのツール
 
-Locaは以下のツールを自律的に選択し、タスクを遂行します。
+Locaは以下のツールを自律的に選択し、タスクを遂行します。各ツールは `ToolRegistry` で一元管理されており、プラグインを含むすべてのツールが同じ仕組みで登録・実行されます。
 
 | ツール | 説明 |
 | --- | --- |
@@ -107,6 +107,8 @@ Locaは以下のツールを自律的に選択し、タスクを遂行します�
 | `read_directory` | ディレクトリ構造の取得 |
 | `web_search` | DuckDuckGoによるWeb検索 |
 | `none` | タスク完了の宣言 |
+
+LLMとの通信にはFunction Callingを使用しており、JSONのテキストパースに依存しないため、パースエラーが発生しません。Function Calling非対応のモデルでは自動的にJSONフォールバックモードで動作します。
 
 ### 🔌 プラグイン
 
@@ -169,14 +171,16 @@ def run(args: dict) -> str:
 Loca/
 ├── src/loca/
 │   ├── config.py      # デフォルトモデル・プロバイダー、パス管理
-│   ├── main.py        # エントリーポイント、メインループ、メッセージ管理
+│   ├── main.py        # エントリーポイント（AgentSession に委譲するだけ）
 │   ├── core/
-│   │   ├── llm_client.py   # LiteLLM経由のLLM通信・JSONパース
-│   │   ├── prompts.py      # システムプロンプト・ツール定義
+│   │   ├── agent_session.py # セッション状態とメインループを管理するクラス
+│   │   ├── tool_registry.py # Tool / ToolRegistry（ツールの一元管理）
+│   │   ├── llm_client.py   # LiteLLM経由のLLM通信（Function Calling対応）
+│   │   ├── prompts.py      # システムプロンプト（FCモード・JSONモード）
 │   │   ├── memory.py       # Loca.mdの読み書き（記憶システム）
 │   │   ├── pro_agent.py    # /pro モードのEditor/Reviewerロジック
 │   │   ├── router.py       # コマンドルーティング（/ask, /pro, /undo 等）
-│   │   └── executor.py     # アクション実行・ユーザー確認フロー
+│   │   └── executor.py     # ツールハンドラーとToolRegistryのファクトリー
 │   ├── tools/
 │   │   ├── commander.py    # シェルコマンドの安全な実行
 │   │   ├── file_ops.py     # ファイル読み書き・パス安全検証

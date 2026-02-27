@@ -96,7 +96,7 @@ loca -p openai -m gpt-4o
 
 ### 🛠️ 7 Built-in Tools
 
-Loca autonomously selects from these tools to complete your tasks:
+Loca autonomously selects from these tools to complete your tasks. All tools — including plugins — are managed through a unified `ToolRegistry`, so adding a new tool requires changes to just one file.
 
 | Tool | Description |
 | --- | --- |
@@ -107,6 +107,8 @@ Loca autonomously selects from these tools to complete your tasks:
 | `read_directory` | Explore project structure |
 | `web_search` | Search via DuckDuckGo |
 | `none` | Signal task completion |
+
+Tool selection uses the LLM's native Function Calling API, which means no JSON text parsing and no parse errors. Models that don't support Function Calling fall back to JSON mode automatically.
 
 ### 🔌 Plugin System
 
@@ -169,14 +171,16 @@ Add rules and preferences to `Loca.md` and Loca will follow them in every task:
 Loca/
 ├── src/loca/
 │   ├── config.py      # Default model/provider, path management
-│   ├── main.py        # Entry point, main loop, message management
+│   ├── main.py        # Entry point (delegates to AgentSession)
 │   ├── core/
-│   │   ├── llm_client.py   # LLM communication via LiteLLM
-│   │   ├── prompts.py      # System prompts & tool definitions
+│   │   ├── agent_session.py # Session state & main loop encapsulated in a class
+│   │   ├── tool_registry.py # Tool / ToolRegistry (unified tool management)
+│   │   ├── llm_client.py   # LLM communication via LiteLLM (Function Calling support)
+│   │   ├── prompts.py      # System prompts (FC mode & JSON fallback mode)
 │   │   ├── memory.py       # Loca.md read/write (memory system)
 │   │   ├── pro_agent.py    # /pro mode Editor/Reviewer logic
 │   │   ├── router.py       # Command routing (/ask, /pro, /undo, etc.)
-│   │   └── executor.py     # Action execution & user confirmation
+│   │   └── executor.py     # Tool handlers & ToolRegistry factory
 │   ├── tools/
 │   │   ├── commander.py    # Safe shell command execution
 │   │   ├── file_ops.py     # File I/O with path validation
